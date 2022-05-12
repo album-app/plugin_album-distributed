@@ -22,7 +22,7 @@ Now you can use the plugin:
 album run-distributed solution.py
 ```
 The plugin does two things:
-1. It figures out if the input parameters match multiple tasks - in this case, it generates the different task parameters.
+1. It figures out if the input arguments match multiple tasks - in this case, it generates the different task arguments.
 2. It runs all matching tasks, the mode for running these tasks can be chosen.  
 
 Since the matching part can be tricky, please use the `--dry-run` argument to first print a list of matched tasks:
@@ -34,12 +34,12 @@ On Windows, replace the slashes with backslashes in the examples on this page.
 
 Please let us know if you run into issues.
 
-## Matching input parameters
-To generate multiple tasks, patterns in file name parameters can be used to match multiple files.
+## Matching input arguments
+To generate multiple tasks, patterns in file name arguments can be used to match multiple files.
 
-### Using patterns in a single parameter
+### Using patterns in a single argument
 
-You should be able to use all [`glob`](https://docs.python.org/3/library/glob.html) features when using it in a single parameter. Here are some examples:
+You should be able to use all [`glob`](https://docs.python.org/3/library/glob.html) features when using it in a single argument. Here are some examples:
 
 In the following scenarios `solution.py` has an argument called `input_data`.
 
@@ -58,14 +58,14 @@ Match all `.tif` files recursively, starting from the current folder:
 album run-distributed solution.py --input_data **/*.tif
 ```
 
-### Using patterns in multiple parameters
+### Using patterns in multiple arguments
 
-When using patterns in multiple parameters, this plugin will try to figure out the corresponding parameter names based on which of the patterns match with existing files.
+When using patterns in multiple arguments, this plugin will try to figure out the corresponding argument values based on which of the patterns match with existing files.
 This is likely to fail in a bunch of situations - please use the `--dry-run` argument to test if the matched tasks correspond with your expectation.
 
 In the following scenarios `solution.py` has two arguments called `input_data` and `output_data`.
 
-Use all `.tif` files in the current folder and append `_out` to the file name for the output parameter.
+Use all `.tif` files in the current folder and append `_out` to the file name for the output argument.
 ```
 album run-distributed solution.py --input_data *.tif --output_data *_out.tif
 ```
@@ -75,12 +75,12 @@ Do the same thing recursively:
 album run-distributed solution.py --input_data **/*.tif --output_data **/*_out.tif
 ```
 
-Let the output parameter values live in a different folder:
+Let the output argument values live in a different folder:
 ```
 album run-distributed solution.py --input_data *.tif --output_data output/*.tif
 ```
 
-Since Album does not yet distinguish between input and output parameters, be aware that if the `output_data` parameters in these scenarios matches existing files, the plugin will also try to generate corresponding `input_file` values. We will work on improving this.
+Since Album does not yet distinguish between input and output arguments, be aware that if the `output_data` argument in these scenarios matches existing files, the plugin will also try to generate corresponding `input_file` values. We will work on improving this.
 
 ## Modes
 You can set the mode by using the `--mode` argument:
