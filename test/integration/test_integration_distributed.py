@@ -104,7 +104,7 @@ class TestIntegrationExampleCommand(unittest.TestCase):
                     str(inputfile1).replace('\\', '\\\\'), str(outputfile1).replace('\\', '\\\\')), cm.output[1])
                 self.assertIn(
                     "Running run-mock with args (\'solution.py\', False, ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun']).." % (
-                    str(inputfile2), str(outputfile2)), cm.output[2])
+                    str(inputfile2).replace('\\', '\\\\'), str(outputfile2).replace('\\', '\\\\')), cm.output[2])
 
     @patch('album.argument_parsing.create_album_instance', return_value=mock.create_autospec(Album))
     def test_run_queue(self, create_album_instance_mock):
