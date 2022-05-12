@@ -14,3 +14,5 @@ def create_run_distributed_parser(parser):
         help='Parameter to indicate a dry run and only show what would happen.',
         action='store_true'
     )
+    p.add_argument('--threads', type=int, required=False, default=3,
+                   help='(mode queue only) Number of threads to spawn for processing the task queue.')

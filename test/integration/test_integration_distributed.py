@@ -16,8 +16,8 @@ from album.runner.core.api.model.solution import ISolution
 class TestIntegrationExampleCommand(unittest.TestCase):
 
     @patch('album.argument_parsing.create_album_instance', return_value=mock.create_autospec(Album))
-    def test_run_distributed_dry_run(self, create_album_instance_mock):
-        #mocks
+    def test_run_basic_dry_run(self, create_album_instance_mock):
+        # mocks
         resolve_result = mock.create_autospec(ICollectionSolution)
         create_album_instance_mock.return_value.resolve.return_value = resolve_result
         run_mock = mock.MagicMock()
@@ -26,12 +26,9 @@ class TestIntegrationExampleCommand(unittest.TestCase):
         resolve_result.coordinates.return_value = "my-group:my-solution:my-version"
 
         with self.assertLogs(get_active_logger(), level='INFO') as cm:
-
             # run
             sys.argv = ["", "run-distributed", "solution.py", "--dry-run"]
             self.assertIsNone(main())
-
-            print("\n".join(cm.output))
 
             # assert
             self.assertEqual(2, len(cm.output))
@@ -39,8 +36,8 @@ class TestIntegrationExampleCommand(unittest.TestCase):
             self.assertIn("Would run run-mock with args (\'solution.py\', False, [\'\'])..", cm.output[1])
 
     @patch('album.argument_parsing.create_album_instance', return_value=mock.create_autospec(Album))
-    def test_run_distributed(self, create_album_instance_mock):
-        #mocks
+    def test_run_basic(self, create_album_instance_mock):
+        # mocks
         resolve_result = mock.create_autospec(ICollectionSolution)
         create_album_instance_mock.return_value.resolve.return_value = resolve_result
         run_mock = mock.MagicMock()
@@ -49,12 +46,9 @@ class TestIntegrationExampleCommand(unittest.TestCase):
         resolve_result.coordinates.return_value = "my-group:my-solution:my-version"
 
         with self.assertLogs(get_active_logger(), level='INFO') as cm:
-
             # run
             sys.argv = ["", "run-distributed", "solution.py"]
             self.assertIsNone(main())
-
-            print("\n".join(cm.output))
 
             # assert
             self.assertEqual(2, len(cm.output))
@@ -63,8 +57,8 @@ class TestIntegrationExampleCommand(unittest.TestCase):
             run_mock.assert_called_with(("solution.py", False, [""]))
 
     @patch('album.argument_parsing.create_album_instance', return_value=mock.create_autospec(Album))
-    def test_run_distributed_with_magic(self, create_album_instance_mock):
-        #mocks
+    def test_run_basic_with_magic(self, create_album_instance_mock):
+        # mocks
         collection_entry = mock.create_autospec(ICollectionSolution)
         solution_setup_args = [
             {"name": "input"},
@@ -97,20 +91,46 @@ class TestIntegrationExampleCommand(unittest.TestCase):
             output_pattern = str(tmpdir.joinpath("**", "output*.tif"))
 
             with self.assertLogs(get_active_logger(), level='INFO') as cm:
-
                 # run
                 sys.argv = ["", "run-distributed", "solution.py", "--input", input_pattern, "--output", output_pattern,
                             "--other", "sun"]
                 self.assertIsNone(main())
 
-                print("\n".join(cm.output))
-
                 # assert
                 self.assertEqual(3, len(cm.output))
                 self.assertIn("contact via ", cm.output[0])
-                self.assertIn("Running run-mock with args (\'solution.py\', False, ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun']).." % (inputfile1, outputfile1), cm.output[1])
-                self.assertIn("Running run-mock with args (\'solution.py\', False, ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun']).." % (inputfile2, outputfile2), cm.output[2])
+                self.assertIn(
+                    "Running run-mock with args (\'solution.py\', False, ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun']).." % (
+                    str(inputfile1), str(outputfile1)), cm.output[1])
+                self.assertIn(
+                    "Running run-mock with args (\'solution.py\', False, ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun']).." % (
+                    str(inputfile2), str(outputfile2)), cm.output[2])
 
+    @patch('album.argument_parsing.create_album_instance', return_value=mock.create_autospec(Album))
+    def test_run_queue(self, create_album_instance_mock):
+        # mocks
+        resolve_result = mock.create_autospec(ICollectionSolution)
+        create_album_instance_mock.return_value.resolve.return_value = resolve_result
+        run_mock = mock.MagicMock()
+        run_mock.__name__ = "run-mock"
+        create_album_instance_mock.return_value.run = run_mock
+        resolve_result.coordinates.return_value = "my-group:my-solution:my-version"
+
+        with self.assertLogs(get_active_logger(), level='INFO') as cm:
+            # run
+            sys.argv = ["", "run-distributed", "solution.py", "--mode", "queue", "--threads", "5"]
+            self.assertIsNone(main())
+
+            # assert
+            self.assertEqual(6, len(cm.output))
+            print("\n".join(cm.output))
+            self.assertIn("contact via ", cm.output[0])
+            self.assertIn("Running run-mock with args (\'solution.py\', False, [\'\'])..", cm.output[1])
+            self.assertIn("Initializing 5 worker threads", cm.output[2])
+            self.assertIn("registering task 0", cm.output[3])
+            self.assertIn("starting task 0", cm.output[4])
+            self.assertIn("finished task 0", cm.output[5])
+            run_mock.assert_called_with("solution.py", False, [""])
 
 if __name__ == '__main__':
     unittest.main()
