@@ -5,7 +5,7 @@ This is an early version of enhancing album with calls for batch and distributed
 1. [install Album](https://docs.album.solutions/en/latest/installation-instructions.html#)
 2. Activate the album environment:
 ```
-conda acitvate album
+conda activate album
 ```
 3. Install this plugin:
 ```
