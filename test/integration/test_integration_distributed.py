@@ -101,7 +101,7 @@ class TestIntegrationExampleCommand(unittest.TestCase):
                 self.assertIn("contact via ", cm.output[0])
                 self.assertIn(
                     "Running run-mock with args (\'solution.py\', False, ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun']).." % (
-                    str(inputfile1), str(outputfile1)), cm.output[1])
+                    str(inputfile1).replace('\\', '\\\\'), str(outputfile1).replace('\\', '\\\\')), cm.output[1])
                 self.assertIn(
                     "Running run-mock with args (\'solution.py\', False, ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun']).." % (
                     str(inputfile2), str(outputfile2)), cm.output[2])
@@ -123,7 +123,6 @@ class TestIntegrationExampleCommand(unittest.TestCase):
 
             # assert
             self.assertEqual(6, len(cm.output))
-            print("\n".join(cm.output))
             self.assertIn("contact via ", cm.output[0])
             self.assertIn("Running run-mock with args (\'solution.py\', False, [\'\'])..", cm.output[1])
             self.assertIn("Initializing 5 worker threads", cm.output[2])

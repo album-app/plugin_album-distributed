@@ -131,8 +131,8 @@ class TestReverseGlob(unittest.TestCase):
             self.assertEqual((str(inputfile3), [str(outputfile3)]), res[1])
 
     def test_reverse_glob_recursive_relative(self):
-        cwd = os.getcwd()
         with tempfile.TemporaryDirectory() as tmpdirname:
+            cwd = os.getcwd()
             os.chdir(tmpdirname)
             tmpdir = Path()
             inputfile2 = tmpdir.joinpath("input2.tif")
@@ -149,7 +149,7 @@ class TestReverseGlob(unittest.TestCase):
             self.assertEqual(2, len(res))
             self.assertEqual((str(inputfile2), [str(outputfile2)]), res[0])
             self.assertEqual((str(inputfile3), [str(outputfile3)]), res[1])
-        os.chdir(cwd)
+            os.chdir(cwd)
 
     def test_reverse_glob_output_in_different_dir(self):
         with tempfile.TemporaryDirectory() as tmpdirname:
