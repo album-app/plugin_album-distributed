@@ -12,4 +12,4 @@ def run(_: Album, args, tasks: List[ITask]):
     else:
         for task in tasks:
             get_active_logger().info("Running %s with args %s.." % (task.method().__name__, task.args()))
-            task.method()(task.args())
+            task.method()(*task.args())

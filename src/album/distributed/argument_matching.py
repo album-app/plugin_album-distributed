@@ -42,12 +42,12 @@ def generate_run_tasks(album_instance: Album, solution: str, argv):
                     argv_copy[arg_val_index + 1] = entries[arg_entry]
                 except ValueError:
                     pass
-            task._args = (solution, False, argv_copy)
+            task._args = (solution, argv_copy, False)
             res.append(task)
     else:
         task = Task()
         task._method = task_method
-        task._args = (solution, False, argv)
+        task._args = (solution, argv, False)
         res.append(task)
     return res
 
