@@ -33,7 +33,7 @@ class TestIntegrationExampleCommand(unittest.TestCase):
             # assert
             self.assertEqual(2, len(cm.output))
             self.assertIn("contact via ", cm.output[0])
-            self.assertIn("Would run run-mock with args (\'solution.py\', False, [\'\'])..", cm.output[1])
+            self.assertIn("Would run run-mock with args (\'solution.py\', [\'\'], False)..", cm.output[1])
 
     @patch('album.argument_parsing.create_album_instance', return_value=mock.create_autospec(Album))
     def test_run_basic(self, create_album_instance_mock):
@@ -53,8 +53,8 @@ class TestIntegrationExampleCommand(unittest.TestCase):
             # assert
             self.assertEqual(2, len(cm.output))
             self.assertIn("contact via ", cm.output[0])
-            self.assertIn("Running run-mock with args (\'solution.py\', False, [\'\'])..", cm.output[1])
-            run_mock.assert_called_with(("solution.py", False, [""]))
+            self.assertIn("Running run-mock with args (\'solution.py\', [\'\'], False)..", cm.output[1])
+            run_mock.assert_called_with("solution.py", [""], False)
 
     @patch('album.argument_parsing.create_album_instance', return_value=mock.create_autospec(Album))
     def test_run_basic_with_magic(self, create_album_instance_mock):
@@ -100,11 +100,11 @@ class TestIntegrationExampleCommand(unittest.TestCase):
                 self.assertEqual(3, len(cm.output))
                 self.assertIn("contact via ", cm.output[0])
                 self.assertIn(
-                    "Running run-mock with args (\'solution.py\', False, ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun']).." % (
-                    str(inputfile1).replace('\\', '\\\\'), str(outputfile1).replace('\\', '\\\\')), cm.output[1])
+                    "Running run-mock with args (\'solution.py\', ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun'], False).." % (
+                        str(inputfile1).replace('\\', '\\\\'), str(outputfile1).replace('\\', '\\\\')), cm.output[1])
                 self.assertIn(
-                    "Running run-mock with args (\'solution.py\', False, ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun']).." % (
-                    str(inputfile2).replace('\\', '\\\\'), str(outputfile2).replace('\\', '\\\\')), cm.output[2])
+                    "Running run-mock with args (\'solution.py\', ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun'], False).." % (
+                        str(inputfile2).replace('\\', '\\\\'), str(outputfile2).replace('\\', '\\\\')), cm.output[2])
 
     @patch('album.argument_parsing.create_album_instance', return_value=mock.create_autospec(Album))
     def test_run_queue(self, create_album_instance_mock):
@@ -124,12 +124,13 @@ class TestIntegrationExampleCommand(unittest.TestCase):
             # assert
             self.assertEqual(6, len(cm.output))
             self.assertIn("contact via ", cm.output[0])
-            self.assertIn("Running run-mock with args (\'solution.py\', False, [\'\'])..", cm.output[1])
+            self.assertIn("Running run-mock with args (\'solution.py\', [\'\'], False)..", cm.output[1])
             self.assertIn("Initializing 5 worker threads", cm.output[2])
             self.assertIn("registering task 0", cm.output[3])
             self.assertIn("starting task 0", cm.output[4])
             self.assertIn("finished task 0", cm.output[5])
-            run_mock.assert_called_with("solution.py", False, [""])
+            run_mock.assert_called_with("solution.py", [""], False)
+
 
 if __name__ == '__main__':
     unittest.main()

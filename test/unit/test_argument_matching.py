@@ -25,7 +25,7 @@ class TestReverseGlob(unittest.TestCase):
         argv = ["", "", "--input", "input.txt", "--output", "output.txt"]
         tasks = generate_run_tasks(album, "solution.py", argv)
         self.assertEqual(1, len(tasks))
-        self.assertEqual(['', '', '--input', 'input.txt', '--output', 'output.txt'], tasks[0].args()[2])
+        self.assertEqual(['', '', '--input', 'input.txt', '--output', 'output.txt'], tasks[0].args()[1])
 
     def test__generate_run_tasks_with_magic(self):
         album = mock.create_autospec(Album)
@@ -58,8 +58,8 @@ class TestReverseGlob(unittest.TestCase):
             argv = ["", "", "--input", input_pattern, "--output", output_pattern]
             tasks = generate_run_tasks(album, "solution.py", argv)
             self.assertEqual(2, len(tasks))
-            self.assertEqual(['', '', '--input', str(inputfile1), '--output', str(outputfile1)], tasks[0].args()[2])
-            self.assertEqual(['', '', '--input', str(inputfile2), '--output', str(outputfile2)], tasks[1].args()[2])
+            self.assertEqual(['', '', '--input', str(inputfile1), '--output', str(outputfile1)], tasks[0].args()[1])
+            self.assertEqual(['', '', '--input', str(inputfile2), '--output', str(outputfile2)], tasks[1].args()[1])
 
     def test__get_all_combinations(self):
         with tempfile.TemporaryDirectory() as tmpdirname:
