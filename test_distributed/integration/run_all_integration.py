@@ -1,7 +1,7 @@
 import time
 import unittest
 
-from test.integration import test_integration_distributed
+from test_distributed.integration import test_integration_distributed
 
 
 def main():
