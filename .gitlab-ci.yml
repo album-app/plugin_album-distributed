@@ -213,7 +213,7 @@ cmdline linux:
   stage: build
   script:
     # album commands
-    - album run-distributed -h
+    - MICROMAMBA_EXECUTABLE run -n album album run-distributed -h
 
 # Linux Tests
 
