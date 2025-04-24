@@ -30,6 +30,10 @@
     - '& $7ZIP_EXE x micromamba.tar -ttar -aoa -r Library\bin\micromamba.exe $("-o" + (Join-Path -Path (Get-Location) -ChildPath micromamba_installation))'
     - '$progressPreference = $oldProgressPreference'
     - '.\micromamba_installation\Library\bin\micromamba.exe create -y -n album python=$env:TEST_PYTHON_VERSION pip git -c conda-forge'
+    - 'if($env:ALBUM_DEV_ONLY -match "True") { echo "CAUTION! DEV ONLY OPTION ACTIVE. ENABLE/DISABLE BY SETTING ALBUM_DEV_ONLY GITLAB-RUNNER VARIABLE." }'
+    - 'if($env:ALBUM_DEV_ONLY -match "True") { .\micromamba_installation\Library\bin\micromamba.exe run -n album pip install git+https://gitlab.com/album-app/album-solution-api.git@dev}'
+    - 'if($env:ALBUM_DEV_ONLY -match "True") { .\micromamba_installation\Library\bin\micromamba.exe run -n album pip install git+https://gitlab.com/album-app/album-environments.git@dev}'
+    - 'if($env:ALBUM_DEV_ONLY -match "True") { .\micromamba_installation\Library\bin\micromamba.exe run -n album pip install git+https://gitlab.com/album-app/album.git@dev}'
     - '.\micromamba_installation\Library\bin\micromamba.exe run -n album pip install --no-cache-dir $Env:CI_PROJECT_DIR'
   tags:
     - windows
@@ -60,6 +64,10 @@
     - curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/1.5.6 | tar -xvj -C $CI_PROJECT_DIR/bin/ --strip-components=1 bin/micromamba
     - MICROMAMBA_EXECUTABLE=$CI_PROJECT_DIR/bin/micromamba
     - $MICROMAMBA_EXECUTABLE create -y -n album python=$TEST_PYTHON_VERSION pip git -c conda-forge
+    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && echo "CAUTION! DEV ONLY OPTION ACTIVE. ENABLE/DISABLE BY SETTING ALBUM_DEV_ONLY GITLAB-RUNNER VARIABLE."'
+    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-solution-api.git@dev'
+    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-environments.git@dev'
+    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album.git@dev'
     - $MICROMAMBA_EXECUTABLE run -n album pip install --no-cache-dir $CI_PROJECT_DIR
     - $MICROMAMBA_EXECUTABLE run -n album python -V
     - $MICROMAMBA_EXECUTABLE run -n album pip list
@@ -89,6 +97,10 @@
     - curl -Ls https://micro.mamba.pm/api/micromamba/osx-64/1.5.6 | tar -xvj -C $tmpdir/bin/ --strip-components=1 bin/micromamba
     - MICROMAMBA_EXECUTABLE=$tmpdir/bin/micromamba
     - $MICROMAMBA_EXECUTABLE create -y -n album python=$TEST_PYTHON_VERSION pip git -c conda-forge
+    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && echo "CAUTION! DEV ONLY OPTION ACTIVE. ENABLE/DISABLE BY SETTING ALBUM_DEV_ONLY GITLAB-RUNNER VARIABLE."'
+    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-solution-api.git@dev'
+    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-environments.git@dev'
+    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album.git@dev'
     - $MICROMAMBA_EXECUTABLE run -n album pip install --no-cache-dir $CI_PROJECT_DIR
     - $MICROMAMBA_EXECUTABLE run -n album python -V
     - $MICROMAMBA_EXECUTABLE run -n album pip list
