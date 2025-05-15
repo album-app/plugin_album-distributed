@@ -64,10 +64,10 @@
     - curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/1.5.6 | tar -xvj -C $CI_PROJECT_DIR/bin/ --strip-components=1 bin/micromamba
     - MICROMAMBA_EXECUTABLE=$CI_PROJECT_DIR/bin/micromamba
     - $MICROMAMBA_EXECUTABLE create -y -n album python=$TEST_PYTHON_VERSION pip git -c conda-forge
-    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && echo "CAUTION! DEV ONLY OPTION ACTIVE. ENABLE/DISABLE BY SETTING ALBUM_DEV_ONLY GITLAB-RUNNER VARIABLE."'
-    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-solution-api.git@dev'
-    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-environments.git@dev'
-    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album.git@dev'
+    - set -euo pipefail; [[ "${ALBUM_DEV_ONLY}" == "True" ]] && echo "CAUTION! DEV ONLY OPTION ACTIVE. ENABLE/DISABLE BY SETTING ALBUM_DEV_ONLY GITLAB-RUNNER VARIABLE."'
+    - set -euo pipefail; [[ "${ALBUM_DEV_ONLY}" == "True" ]] &&  $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-solution-api.git@dev'
+    - set -euo pipefail; [[ "${ALBUM_DEV_ONLY}" == "True" ]] &&  $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-environments.git@dev'
+    - set -euo pipefail; [[ "${ALBUM_DEV_ONLY}" == "True" ]] &&  $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album.git@dev'
     - $MICROMAMBA_EXECUTABLE run -n album pip install --no-cache-dir $CI_PROJECT_DIR
     - $MICROMAMBA_EXECUTABLE run -n album python -V
     - $MICROMAMBA_EXECUTABLE run -n album pip list
@@ -85,8 +85,11 @@
 #
 .macos_base_template:
   tags:
-    - saas-macos-medium-m1
-  image: macos-14-xcode-15
+    - macos
+    - shell
+  variables:
+    MICROMAMBA_EXECUTABLE: "" # ensure that the variable is empty before running the job
+    PIP_CACHE_DIR: $CI_PROJECT_DIR/.cache/pip
   before_script:
     - echo "$(uname)"
     - sw_vers
@@ -97,10 +100,10 @@
     - curl -Ls https://micro.mamba.pm/api/micromamba/osx-64/1.5.6 | tar -xvj -C $tmpdir/bin/ --strip-components=1 bin/micromamba
     - MICROMAMBA_EXECUTABLE=$tmpdir/bin/micromamba
     - $MICROMAMBA_EXECUTABLE create -y -n album python=$TEST_PYTHON_VERSION pip git -c conda-forge
-    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && echo "CAUTION! DEV ONLY OPTION ACTIVE. ENABLE/DISABLE BY SETTING ALBUM_DEV_ONLY GITLAB-RUNNER VARIABLE."'
-    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-solution-api.git@dev'
-    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-environments.git@dev'
-    - bash -c '[[ $ALBUM_DEV_ONLY == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album.git@dev'
+    - set -euo pipefail; [[ "${ALBUM_DEV_ONLY}" == "True" ]] && echo "CAUTION! DEV ONLY OPTION ACTIVE. ENABLE/DISABLE BY SETTING ALBUM_DEV_ONLY GITLAB-RUNNER VARIABLE."'
+    - set -euo pipefail; [[ "${ALBUM_DEV_ONLY}" == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-solution-api.git@dev'
+    - set -euo pipefail; [[ "${ALBUM_DEV_ONLY}" == "True" ]] && && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-environments.git@dev'
+    - set -euo pipefail; [[ "${ALBUM_DEV_ONLY}" == "True" ]] && && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album.git@dev'
     - $MICROMAMBA_EXECUTABLE run -n album pip install --no-cache-dir $CI_PROJECT_DIR
     - $MICROMAMBA_EXECUTABLE run -n album python -V
     - $MICROMAMBA_EXECUTABLE run -n album pip list
