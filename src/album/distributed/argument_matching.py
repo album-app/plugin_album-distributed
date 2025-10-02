@@ -11,7 +11,6 @@ from album.runner.core.api.model.solution import ISolution
 
 
 def generate_run_tasks(album_instance: Album, solution: str, argv):
-    task_method = album_instance.run
     resolved_solution = album_instance.resolve(solution)
     args = __parse_args(resolved_solution.loaded_solution(), argv)[0]
     res = []
@@ -33,8 +32,7 @@ def generate_run_tasks(album_instance: Album, solution: str, argv):
             singular_args[arg] = arg_val
     if len(potential_list_args) > 0:
         for entries in _get_all_combinations(potential_list_args, singular_args):
-            task = Task()
-            task._method = task_method
+            task = Task(album_instance._controller.run_manager().run)
             argv_copy = argv.copy()
             for arg_entry in entries:
                 try:
@@ -45,8 +43,7 @@ def generate_run_tasks(album_instance: Album, solution: str, argv):
             task._args = (solution, argv_copy, False)
             res.append(task)
     else:
-        task = Task()
-        task._method = task_method
+        task = Task(album_instance._controller.run_manager().run)
         task._args = (solution, argv, False)
         res.append(task)
     return res
