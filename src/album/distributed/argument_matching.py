@@ -100,7 +100,7 @@ def get_all_combinations(potential_list_args, singular_args):
     # Consider only dirs that contain ALL file-args
     common_dirs = set.intersection(*(set(grouped[arg].keys()) for arg in grouped))
 
-    for folder in common_dirs:
+    for folder in sorted(common_dirs):
         keys = list(file_args.keys()) + list(single_args.keys())
         values = [grouped[arg][folder] for arg in file_args] + [single_args[arg] for arg in single_args]
 
