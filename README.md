@@ -9,7 +9,7 @@ conda activate album
 ```
 3. Install this plugin:
 ```
-pip install https://gitlab.com/album-app/plugins/album-distributed/-/archive/main/album-distributed-main.zip
+pip install album-distributed
 ```
 
 ## Usage
