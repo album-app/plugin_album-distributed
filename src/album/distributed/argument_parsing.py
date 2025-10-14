@@ -4,7 +4,7 @@ from album.distributed import distributed_modes
 def create_run_distributed_parser(parser):
     p = parser.create_command_parser('run-distributed', distributed_modes.run, 'Run a solution in batch mode.')
     p.add_argument('solution', type=str, help='Path for the solution file or coordinates of the solution '
-                                              '(group:name:version)')
+                                              '(catalog:group:name:version).')
     p.add_argument('--mode', type=str, required=False, default="basic",
                    help='Mode describing how to run the solution repeatedly. '
                         'Current choices: %s' % " ".join(distributed_modes.get_run_mode_choices()))
