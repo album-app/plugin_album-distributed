@@ -5,9 +5,13 @@ This is an early version of enhancing album with calls for batch and distributed
 1. [install Album](https://docs.album.solutions/en/latest/installation-instructions.html#)
 2. Activate the album environment:
 ```
-conda activate album
+micromamba activate album
 ```
 3. Install this plugin:
+```
+micromamba install album-distributed -c conda-forge
+```
+Or via pip:
 ```
 pip install album-distributed
 ```

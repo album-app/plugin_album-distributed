@@ -1,5 +1,12 @@
 # CI Routine for the album framework.
 
+# Prevent duplicate pipelines: only run branch pipelines and cross-project triggers.
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - when: always
+
 #----------------------------
 # templates
 #----------------------------
@@ -154,6 +161,8 @@ prepare release:
     reports:
       dotenv: variables.env
   rules:
+    - if: $ALBUM_DEV_ONLY == "True"
+      when: never
     - if: $CI_COMMIT_TAG
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -172,6 +181,8 @@ gitlab release:
   script:
     - echo "running release_job for version $VERSION and tag $TAG"
   rules:
+    - if: $ALBUM_DEV_ONLY == "True"
+      when: never
     - if: $CI_COMMIT_TAG
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -199,6 +210,8 @@ gitlab pypi deploy:
     - python setup.py sdist bdist_wheel
     - TWINE_PASSWORD=${CI_JOB_TOKEN} TWINE_USERNAME=gitlab-ci-token python -m twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi dist/*
   rules:
+    - if: $ALBUM_DEV_ONLY == "True"
+      when: never
     - if: $CI_COMMIT_TAG
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -223,6 +236,8 @@ pypi deploy:
     - python setup.py sdist bdist_wheel
     - TWINE_PASSWORD=$PYPI_DEPLOY_TOKEN TWINE_USERNAME=$PYPI_DEPLOY_USER python -m twine upload --repository-url https://upload.pypi.org/legacy/  dist/*
   rules:
+    - if: $ALBUM_DEV_ONLY == "True"
+      when: never
     - if: $CI_COMMIT_TAG
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
