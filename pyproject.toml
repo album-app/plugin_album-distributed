@@ -7,12 +7,12 @@ name = "album-distributed"
 version = "0.2.1"
 authors = [
     {name = "Deborah Schmidt", email = "mail@frauzufall.de"},
-    {name = "Jan Philipp Albrecht", email = "j.p.albrecht@fu-berlin.de"},
+    {name = "Jan Philipp Albrecht", email = "album@jpalbrecht.de"},
     {name = "Kyle Harrington", email = "album@kyleharrington.com"},
 ]
 maintainers = [
     {name = "Deborah Schmidt", email = "mail@frauzufall.de"},
-    {name = "Jan Philipp Albrecht", email = "j.p.albrecht@fu-berlin.de"},
+    {name = "Jan Philipp Albrecht", email = "album@jpalbrecht.de"},
     {name = "Kyle Harrington", email = "album@kyleharrington.com"},
 ]
 description = "Album is a framework for unifying computational tools across frameworks, languages, and environments."
