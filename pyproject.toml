@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=42"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "album-distributed"
+version = "0.2.1"
+authors = [
+    {name = "Deborah Schmidt", email = "mail@frauzufall.de"},
+    {name = "Jan Philipp Albrecht", email = "album@jpalbrecht.de"},
+    {name = "Kyle Harrington", email = "album@kyleharrington.com"},
+]
+maintainers = [
+    {name = "Deborah Schmidt", email = "mail@frauzufall.de"},
+    {name = "Jan Philipp Albrecht", email = "album@jpalbrecht.de"},
+    {name = "Kyle Harrington", email = "album@kyleharrington.com"},
+]
+description = "Album is a framework for unifying computational tools across frameworks, languages, and environments."
+license = "MIT"
+license-files = ["LICENSE"]
+readme = "README.md"
+keywords = ["virtual environments", "imaging", "data analysis"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Utilities"
+]
+requires-python = ">=3.10"
+dependencies = [
+    "album>=0.12.0,<0.13.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.urls]
+Documentation = "https://docs.album.solutions/en/latest/"
+Homepage = "https://album.solutions/"
+DeveloperDocumentation = "https://gitlab.com/album-app/album/-/wikis/home"
+Repository = "https://gitlab.com/album-app/plugins/album-distributed"
+Tracker= "https://gitlab.com/album-app/plugins/album-distributed/issues"
+
+[project.entry-points."console_parsers_album"]
+run-distributed="album.distributed.argument_parsing:create_run_distributed_parser"
