@@ -77,16 +77,16 @@ workflow:
     - $MICROMAMBA_EXECUTABLE create -y -n album -c conda-forge python=$TEST_PYTHON_VERSION
     - echo $CI_COMMIT_REF_NAME
     - echo $ALBUM_DEV_DISTRIBUTED
-    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && echo "CAUTION! DEV ONLY OPTION ACTIVE. ENABLE/DISABLE BY SETTING ALBUM_DEV_DISTRIBUTED GITLAB-RUNNER VARIABLE."'
-    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-solution-api.git@dev'
-    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-environments.git@dev'
-    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album.git@dev'
+    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && echo "CAUTION! DEV ONLY OPTION ACTIVE. ENABLE/DISABLE BY SETTING ALBUM_DEV_DISTRIBUTED GITLAB-RUNNER VARIABLE." || echo "ALBUM_DEV_DISTRIBUTED not active"'
+    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-solution-api.git@dev || echo "ALBUM_DEV_DISTRIBUTED not active"'
+    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-environments.git@dev || echo "ALBUM_DEV_DISTRIBUTED not active"'
+    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album.git@dev || echo "ALBUM_DEV_DISTRIBUTED not active"'
     - $MICROMAMBA_EXECUTABLE run -n album pip install --no-cache-dir -e $CI_PROJECT_DIR # -e needed for coverage
     - $MICROMAMBA_EXECUTABLE run -n album pip install coverage
     - $MICROMAMBA_EXECUTABLE run -n album python -V
     - $MICROMAMBA_EXECUTABLE run -n album pip list
     - $MICROMAMBA_EXECUTABLE run -n album env -0 | sort -z | tr '\0' '\n' | grep -i album
-    - export ENVIRONMENT_DEBUGGING_MICROMAMBA_PATH=$MICROMAMBA_EXECUTABLE # explicitly set conda-lock path as it comes as dependency# set environment variables necessary to work with the environment API
+    - export ENVIRONMENT_DEBUGGING_MICROMAMBA_PATH=$MICROMAMBA_EXECUTABLE # set environment variables necessary to work with the environment API
     - export ENVIRONMENT_CONDA_LOCK_PATH=$(which conda-lock)
   cache:
     key: one-key-to-rule-them-all-linux
@@ -119,16 +119,16 @@ workflow:
     - $MICROMAMBA_EXECUTABLE create -y -n album -c conda-forge python=$TEST_PYTHON_VERSION
     - echo $CI_COMMIT_REF_NAME
     - echo $ALBUM_DEV_DISTRIBUTED
-    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && echo "CAUTION! DEV ONLY OPTION ACTIVE. ENABLE/DISABLE BY SETTING ALBUM_DEV_DISTRIBUTED GITLAB-RUNNER VARIABLE."'
-    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-solution-api.git@dev'
-    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-environments.git@dev'
-    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album.git@dev'
+    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && echo "CAUTION! DEV ONLY OPTION ACTIVE. ENABLE/DISABLE BY SETTING ALBUM_DEV_DISTRIBUTED GITLAB-RUNNER VARIABLE." || echo "ALBUM_DEV_DISTRIBUTED not active"'
+    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-solution-api.git@dev || echo "ALBUM_DEV_DISTRIBUTED not active"'
+    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album-environments.git@dev || echo "ALBUM_DEV_DISTRIBUTED not active"'
+    - bash -c '[[ $ALBUM_DEV_DISTRIBUTED == "True" ]] && $MICROMAMBA_EXECUTABLE run -n album pip install git+https://gitlab.com/album-app/album.git@dev || echo "ALBUM_DEV_DISTRIBUTED not active"'
     - $MICROMAMBA_EXECUTABLE run -n album pip install --no-cache-dir -e $CI_PROJECT_DIR # -e needed for coverage
     - $MICROMAMBA_EXECUTABLE run -n album pip install coverage
     - $MICROMAMBA_EXECUTABLE run -n album python -V
     - $MICROMAMBA_EXECUTABLE run -n album pip list
     - $MICROMAMBA_EXECUTABLE run -n album env -0 | sort -z | tr '\0' '\n' | grep -i album
-    - export ENVIRONMENT_DEBUGGING_MICROMAMBA_PATH=$MICROMAMBA_EXECUTABLE # explicitly set conda-lock path as it comes as dependency# set environment variables necessary to work with the environment API
+    - export ENVIRONMENT_DEBUGGING_MICROMAMBA_PATH=$MICROMAMBA_EXECUTABLE # set environment variables necessary to work with the environment API
     - export ENVIRONMENT_CONDA_LOCK_PATH=$(which conda-lock)
   after_script:
     - tmpdir=$(</tmp/tmpdir)
