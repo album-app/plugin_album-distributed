@@ -80,7 +80,7 @@ class TestIntegrationExampleCommand(unittest.TestCase):
 
             # assert
             self.assertEqual(3, len(cm.output))
-            self.assertIn("Would run run-mock with args (\'solution.py\', [\'\'], False)..", cm.output[2])
+            self.assertIn("Would run run-mock with args (\'solution.py\', False, [\'\'])..", cm.output[2])
 
     def test_run_basic(self):
         # mocks
@@ -98,9 +98,10 @@ class TestIntegrationExampleCommand(unittest.TestCase):
             self.assertIsNone(main())
 
             # assert
-            self.assertEqual(3, len(cm.output))
-            self.assertIn("Running run-mock with args (\'solution.py\', [\'\'], False)..", cm.output[2])
-            run_mock.assert_called_with("solution.py", [""], False)
+            self.assertEqual(4, len(cm.output))
+            self.assertIn("Summary: 1 of 1 task(s) succeeded, 0 failed.", cm.output[3])
+            self.assertIn("Running run-mock with args (\'solution.py\', False, [\'\'])..", cm.output[2])
+            run_mock.assert_called_with("solution.py", False, [""])
 
     def test_run_basic_with_magic(self):
         # mocks
@@ -146,12 +147,13 @@ class TestIntegrationExampleCommand(unittest.TestCase):
                 self.assertIsNone(main())
 
                 # assert
-                self.assertEqual(4, len(cm.output))
+                self.assertEqual(5, len(cm.output))
+                self.assertIn("Summary: 2 of 2 task(s) succeeded, 0 failed.", cm.output[4])
                 self.assertIn(
-                    "Running run-mock with args (\'solution.py\', ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun'], False).." % (
+                    "Running run-mock with args (\'solution.py\', False, ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun']).." % (
                         str(inputfile1).replace('\\', '\\\\'), str(outputfile1).replace('\\', '\\\\')), cm.output[2])
                 self.assertIn(
-                    "Running run-mock with args (\'solution.py\', ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun'], False).." % (
+                    "Running run-mock with args (\'solution.py\', False, ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun']).." % (
                         str(inputfile2).replace('\\', '\\\\'), str(outputfile2).replace('\\', '\\\\')), cm.output[3])
 
     def test_run_queue(self):
@@ -169,13 +171,35 @@ class TestIntegrationExampleCommand(unittest.TestCase):
             self.assertIsNone(main())
 
             # assert
-            self.assertEqual(7, len(cm.output))
-            self.assertIn("Running run-mock with args (\'solution.py\', [\'\'], False)..", cm.output[2])
+            self.assertEqual(8, len(cm.output))
+            self.assertIn("Running run-mock with args (\'solution.py\', False, [\'\'])..", cm.output[2])
             self.assertIn("Initializing 5 worker threads", cm.output[3])
             self.assertIn("registering task 0", cm.output[4])
             self.assertIn("starting task 0", cm.output[5])
             self.assertIn("finished task 0", cm.output[6])
-            run_mock.assert_called_with("solution.py", [""], False)
+            self.assertIn("Summary: 1 of 1 task(s) succeeded, 0 failed.", cm.output[7])
+            run_mock.assert_called_with("solution.py", False, [""])
+
+    def test_run_queue_failure_exit_status(self):
+        # mocks
+        resolve_result = mock.create_autospec(ICollectionSolution)
+        resolve_result.coordinates.return_value = "my-group:my-solution:my-version"
+        self.album.resolve = MagicMock(return_value=resolve_result)
+        run_mock = mock.MagicMock(side_effect=RuntimeError("solution failed"))
+        run_mock.__name__ = "run-mock"
+        self.album._controller.run_manager().run = run_mock
+
+        with self.assertLogs(get_active_logger(), level='INFO') as cm:
+            # run
+            sys.argv = ["", "run-distributed", "solution.py", "--mode", "queue", "--threads", "1"]
+            with self.assertRaises(SystemExit) as exit_context:
+                main()
+
+            # assert - the command fails instead of exiting with status 0
+            self.assertNotEqual(0, exit_context.exception.code)
+            self.assertIsNotNone(exit_context.exception.code)
+            self.assertTrue(any("Summary: 0 of 1 task(s) succeeded, 1 failed." in line for line in cm.output))
+            self.assertIn("album command failed: 1 of 1 task(s) failed.", cm.output[-1])
 
 
 if __name__ == '__main__':

@@ -75,6 +75,27 @@ class TestDistributedModes(unittest.TestCase):
 
         run_mock.assert_called_once()
 
+    @patch('album.distributed.distributed_modes.mode_basic.run')
+    @patch('album.distributed.distributed_modes.mode_queue.run')
+    def test_run_queue(self, run_queue_mock, run_basic_mock):
+        resolve_result = mock.create_autospec(ICollectionSolution)
+        resolve_result.coordinates.return_value = "my-group:my-solution:my-version"
+        self.album.resolve = MagicMock(return_value=resolve_result)
+        with patch.object(sys, "argv", [""]):
+            distributed_modes.run(self.album, Namespace(solution='solution.py', mode='queue'))
+
+        run_queue_mock.assert_called_once()
+        run_basic_mock.assert_not_called()
+
+    @patch('album.distributed.distributed_modes.generate_run_tasks')
+    def test_run_unknown_mode(self, generate_run_tasks_mock):
+        with self.assertRaises(ValueError):
+            distributed_modes.run(self.album, Namespace(solution='solution.py', mode='bogus'))
+        generate_run_tasks_mock.assert_not_called()
+
+    def test_get_run_mode_choices(self):
+        self.assertEqual(["basic", "queue"], distributed_modes.get_run_mode_choices())
+
 
 if __name__ == '__main__':
     unittest.main()

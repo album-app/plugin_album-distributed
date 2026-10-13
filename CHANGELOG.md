@@ -14,6 +14,37 @@ We use the following:
 - `Fixed` for any bug fixes.
 - `Security` in case of vulnerabilities.
 
+## [unreleased]
+
+### Added
+
+- after running the tasks, a summary with the number of succeeded / failed / not run tasks and the arguments of the
+  failed tasks is logged (`basic` and `queue` mode)
+
+### Changed
+
+- `--mode` only accepts the implemented modes (`basic`, `queue`); the `queue` mode is listed in the help, and an
+  unknown mode is an error instead of silently doing nothing
+
+### Fixed
+
+- `run-distributed` passed the solution arguments to `RunManager.run` in the wrong position (as `run_immediately`),
+  so every task ran the solution without any arguments
+- patterns given as `--arg=value` were never replaced by the matched values; both `--arg value` and `--arg=value` are
+  supported now, and an argument value that cannot be replaced (e.g. an abbreviated argument name) raises an error
+  instead of silently running the solution with the unexpanded pattern
+- `queue` mode exited with status 0 even if tasks failed; the command fails now if any task failed. `basic` mode still
+  stops at the first failing task and passes its error on
+- `--threads 0` (or a negative number) made `queue` mode wait forever without running any task; values below 1 are
+  rejected now
+- on Windows, matched files without a `.tif` extension were not recognized as paths (glob joins them with `\`), so
+  several pattern arguments were combined with each other instead of being paired by folder; a folder spelled with
+  `/` in one pattern and matched by a wildcard in another (`data/sub/*.json` and `data/*/a.png`) did not count as
+  the same folder, so no tasks were generated
+- README: patterns are quoted in all examples (unquoted patterns are expanded by the shell before album sees them),
+  the wrong advice to replace slashes with backslashes on Windows is replaced, and the `queue` mode and the exit
+  status are documented
+
 ## [0.2.1]
 
 ### Changed

@@ -4,6 +4,7 @@ from collections import defaultdict
 import glob
 import itertools
 from album.api import Album
+from album.core.api.model.task import ITask
 from album.core.model.task import Task
 
 from album.runner.core.api.model.solution import ISolution
@@ -12,6 +13,7 @@ from album.runner.core.api.model.solution import ISolution
 def generate_run_tasks(album_instance: Album, solution: str, argv):
     resolved_solution = album_instance.resolve(solution)
     args = __parse_args(resolved_solution.loaded_solution(), argv)[0]
+    run_method = album_instance._controller.run_manager().run
     res = []
     solution_args = resolved_solution.database_entry().setup()["args"]
     solution_args_dict = {}
@@ -34,22 +36,49 @@ def generate_run_tasks(album_instance: Album, solution: str, argv):
     # generate all combinations of list args while keeping singular args constant
     if len(potential_list_args) > 0:
         for entries in get_all_combinations(potential_list_args, singular_args):
-            task = Task(album_instance._controller.run_manager().run)
             argv_copy = argv.copy()
             for arg_entry in entries:
-                try:
-                    arg_val_index = argv_copy.index("--%s" % arg_entry)
-                    argv_copy[arg_val_index + 1] = entries[arg_entry]
-                except ValueError:
-                    pass
-            task._args = (solution, argv_copy, False)
-            res.append(task)
+                if entries[arg_entry] != args.__dict__.get(arg_entry):
+                    set_arg_value(argv_copy, arg_entry, entries[arg_entry])
+            res.append(create_run_task(run_method, solution, argv_copy))
     else:
         # no list args, just run once
-        task = Task(album_instance._controller.run_manager().run)
-        task._args = (solution, argv, False)
-        res.append(task)
+        res.append(create_run_task(run_method, solution, argv))
     return res
+
+
+def create_run_task(run_method, solution: str, argv) -> Task:
+    """Create a task calling ``RunManager.run(solution_to_resolve, run_immediately=False, argv=None)``.
+
+    Task only supports positional arguments, so they have to follow the order of the run signature.
+    """
+    return Task(run_method, (solution, False, argv))
+
+
+def get_task_argv(task: ITask):
+    """Return the solution argv of a task created by ``create_run_task``."""
+    return task.args()[2]
+
+
+def set_arg_value(argv, arg_name: str, value) -> None:
+    """Replace the value of ``--arg_name`` in argv (in place).
+
+    Both ``--arg_name value`` and ``--arg_name=value`` are supported.
+    """
+    flag = "--%s" % arg_name
+    found = False
+    for i, token in enumerate(argv):
+        if token == flag and i + 1 < len(argv):
+            argv[i + 1] = str(value)
+            found = True
+        elif token.startswith(flag + "="):
+            argv[i] = "%s=%s" % (flag, value)
+            found = True
+    if not found:
+        raise ValueError(
+            "Cannot set argument %s to %s: %s not found in %s. "
+            "Please spell out the full argument name (%s VALUE or %s=VALUE)." % (flag, value, flag, argv, flag, flag)
+        )
 
 
 def expand_args(potential_list_args):
@@ -60,7 +89,8 @@ def expand_args(potential_list_args):
     expanded = {}
     for key, pattern in potential_list_args.items():
         if isinstance(pattern, str) and any(c in pattern for c in "*?["):
-            expanded[key] = glob.glob(pattern, recursive=True)
+            # sorted: glob order depends on the file system, keep task order deterministic
+            expanded[key] = sorted(glob.glob(pattern, recursive=True))
         else:
             expanded[key] = [pattern]
     return expanded
@@ -77,7 +107,7 @@ def get_all_combinations(potential_list_args, singular_args):
     # Split args into "file-like" (look like paths) vs "always single"
     file_args, single_args = {}, {}
     for key, values in expanded.items():
-        if all(isinstance(v, str) and ("/" in v or v.endswith(".tif")) for v in values):
+        if all(isinstance(v, str) and (_has_path_separator(v) or v.endswith(".tif")) for v in values):
             file_args[key] = values
         else:
             single_args[key] = values
@@ -86,7 +116,9 @@ def get_all_combinations(potential_list_args, singular_args):
     grouped = {arg: defaultdict(list) for arg in file_args}
     for arg, values in file_args.items():
         for v in values:
-            folder = os.path.dirname(v)
+            # glob keeps the literal part of a pattern as written and joins the matches with the native separator,
+            # so the same folder can be spelled "data/sub" and "data\sub" on Windows
+            folder = os.path.normcase(os.path.normpath(os.path.dirname(v)))
             grouped[arg][folder].append(v)
 
     # If no file args, just yield product of single args
@@ -108,6 +140,11 @@ def get_all_combinations(potential_list_args, singular_args):
             entry = dict(zip(keys, combo))
             entry.update(singular_args)
             yield entry
+
+
+def _has_path_separator(value: str) -> bool:
+    """Check for "/" and os.sep, the separator glob uses to join the matched paths (a backslash on Windows)."""
+    return "/" in value or os.sep in value
 
 
 # TODO this is copied from album.core.controller.script_manager and should be made available from there
