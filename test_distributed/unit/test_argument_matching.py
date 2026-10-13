@@ -1,3 +1,4 @@
+import contextlib
 import inspect
 import os
 import tempfile
@@ -12,6 +13,7 @@ from album.core.controller.run_manager import RunManager
 from album.core.model.resolve_result import ResolveResult
 
 from album.distributed.argument_matching import generate_run_tasks, get_all_combinations, set_arg_value
+from album.runner.album_logging import get_active_logger
 from album.runner.core.api.model.solution import ISolution
 
 
@@ -243,7 +245,474 @@ class TestReverseGlob(unittest.TestCase):
             self.assertEqual(str(outputfile2), res[1]["output"])
             self.assertEqual("bla", res[1]["something"])
 
+    def mock_solution(self, *args):
+        """Let album resolve a solution with the given arguments (names of untyped arguments or argument dicts)."""
+        collection_entry = mock.create_autospec(ICollectionSolution)
+        solution_setup = {"args": [arg if isinstance(arg, dict) else {"name": arg} for arg in args]}
+        loaded_solution = mock.create_autospec(ISolution)
+        loaded_solution.setup = mock.MagicMock(return_value=solution_setup)
+        collection_entry.setup = mock.MagicMock(return_value=solution_setup)
+        self.album.resolve = MagicMock(return_value=ResolveResult("", None, collection_entry, None, loaded_solution))
 
+    def generate_argvs(self, tmpdir, argv):
+        """Generate the tasks in tmpdir (to use relative patterns like in the README) and return their argv."""
+        with working_directory(tmpdir):
+            tasks = generate_run_tasks(self.album, "solution.py", argv)
+        for task in tasks:
+            self.assertEqual("solution.py", task.args()[0])
+            self.assertIs(False, task.args()[1])
+        return [task.args()[2] for task in tasks]
+
+    def test_readme_single_pattern(self):
+        self.mock_solution("input_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif", "b.tif", "c.png")
+            argvs = self.generate_argvs(tmpdir, ["", "--input_data", "*.tif"])
+        self.assertEqual([["", "--input_data", "a.tif"], ["", "--input_data", "b.tif"]], argvs)
+
+    def test_readme_single_pattern_folder(self):
+        self.mock_solution("input_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data = os.path.join(tmpdir, "data")
+            touch(data, "input1.tif", "input2.tif", "other.tif")
+            argvs = self.generate_argvs(tmpdir, ["", "--input_data", data + "/input*.tif"])
+        self.assertEqual(
+            [["", "--input_data", os.path.join(data, "input%s.tif" % i)] for i in [1, 2]], argvs
+        )
+
+    def test_readme_single_pattern_recursive(self):
+        self.mock_solution("input_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif", os.path.join("sub", "b.tif"), os.path.join("sub", "deeper", "c.tif"))
+            argvs = self.generate_argvs(tmpdir, ["", "--input_data", "**/*.tif"])
+        self.assertEqual(
+            [
+                ["", "--input_data", "a.tif"],
+                ["", "--input_data", os.path.join("sub", "b.tif")],
+                ["", "--input_data", os.path.join("sub", "deeper", "c.tif")],
+            ],
+            argvs
+        )
+
+    def test_readme_derive_suffix(self):
+        self.mock_solution("input_data", "output_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif", "b.tif")
+            argvs = self.generate_argvs(tmpdir, ["", "--input_data", "*.tif", "--output_data", "*_out.tif"])
+        self.assertEqual(
+            [
+                ["", "--input_data", "a.tif", "--output_data", "a_out.tif"],
+                ["", "--input_data", "b.tif", "--output_data", "b_out.tif"],
+            ],
+            argvs
+        )
+
+    def test_readme_derive_suffix_recursive(self):
+        self.mock_solution("input_data", "output_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif", os.path.join("sub", "b.tif"))
+            argvs = self.generate_argvs(tmpdir, ["", "--input_data", "**/*.tif", "--output_data", "**/*_out.tif"])
+        self.assertEqual(
+            [
+                ["", "--input_data", "a.tif", "--output_data", "a_out.tif"],
+                ["", "--input_data", os.path.join("sub", "b.tif"), "--output_data", os.path.join("sub", "b_out.tif")],
+            ],
+            argvs
+        )
+
+    def test_readme_derive_output_folder(self):
+        self.mock_solution("input_data", "output_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif", "b.tif")
+            argvs = self.generate_argvs(tmpdir, ["", "--input_data", "*.tif", "--output_data", "output/*.tif"])
+        self.assertEqual(
+            [
+                ["", "--input_data", "a.tif", "--output_data", "output/a.tif"],
+                ["", "--input_data", "b.tif", "--output_data", "output/b.tif"],
+            ],
+            argvs
+        )
+
+    def test_readme_derive_output_folder_recursive(self):
+        self.mock_solution("input_data", "output_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif", os.path.join("sub", "b.tif"))
+            argvs = self.generate_argvs(tmpdir, ["", "--input_data=**/*.tif", "--output_data=output/**/*.tif"])
+        self.assertEqual(
+            [
+                ["", "--input_data=a.tif", "--output_data=output/a.tif"],
+                ["", "--input_data=" + os.path.join("sub", "b.tif"),
+                 "--output_data=output/" + os.path.join("sub", "b.tif")],
+            ],
+            argvs
+        )
+
+    def test_readme_existing_outputs_correspond_by_name(self):
+        self.mock_solution("input_data", "output_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # the outputs of a previous run exist - they also match the input pattern, but are not used as inputs
+            touch(tmpdir, "a.tif", "b.tif", "a_out.tif", "b_out.tif")
+            argvs = self.generate_argvs(tmpdir, ["", "--input_data", "*.tif", "--output_data", "*_out.tif"])
+        self.assertEqual(
+            [
+                ["", "--input_data", "a.tif", "--output_data", "a_out.tif"],
+                ["", "--input_data", "b.tif", "--output_data", "b_out.tif"],
+            ],
+            argvs
+        )
+
+    def test_existing_outputs_correspond_by_name_in_other_folder(self):
+        self.mock_solution("input_data", "output_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif", "b.tif", os.path.join("output", "a.tif"), os.path.join("output", "b.tif"))
+            argvs = self.generate_argvs(tmpdir, ["", "--input_data", "**/*.tif", "--output_data", "output/*.tif"])
+        self.assertEqual(
+            [
+                ["", "--input_data", "a.tif", "--output_data", os.path.join("output", "a.tif")],
+                ["", "--input_data", "b.tif", "--output_data", os.path.join("output", "b.tif")],
+            ],
+            argvs
+        )
+
+    def test_existing_outputs_partially(self):
+        # e.g. the task for b.tif failed in the previous run - running the same command again processes b.tif, too
+        self.mock_solution("input_data", "output_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif", "b.tif", "a_out.tif")
+            with self.assertLogs(get_active_logger(), level="WARNING") as cm:
+                argvs = self.generate_argvs(tmpdir, ["", "--input_data", "*.tif", "--output_data", "*_out.tif"])
+        self.assertEqual(
+            [
+                ["", "--input_data", "a.tif", "--output_data", "a_out.tif"],
+                ["", "--input_data", "b.tif", "--output_data", "b_out.tif"],
+            ],
+            argvs
+        )
+        self.assertIn(
+            "1 file(s) matched by --input_data have no existing counterpart for --output_data, "
+            "using the derived value(s): b_out.tif",
+            cm.output[0]
+        )
+
+    def test_existing_outputs_partially_in_other_folder(self):
+        self.mock_solution("input_data", "output_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(
+                tmpdir, os.path.join("images", "a.tif"), os.path.join("images", "b.tif"), os.path.join("out", "a.tif")
+            )
+            with self.assertLogs(get_active_logger(), level="WARNING"):
+                argvs = self.generate_argvs(tmpdir, ["", "--input_data", "images/*.tif", "--output_data", "out/*.tif"])
+        self.assertEqual(
+            [
+                ["", "--input_data", os.path.join("images", "a.tif"), "--output_data", os.path.join("out", "a.tif")],
+                ["", "--input_data", os.path.join("images", "b.tif"), "--output_data", "out/b.tif"],
+            ],
+            argvs
+        )
+
+    def test_constant_argument(self):
+        self.mock_solution("input_data", "output_dir")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif", os.path.join("sub", "b.tif"))
+            # a value without pattern is passed to every task, no matter if it exists or where it lives
+            argvs = self.generate_argvs(tmpdir, ["", "--input_data", "**/*.tif", "--output_dir", "results/"])
+            self.assertEqual(
+                [
+                    ["", "--input_data", "a.tif", "--output_dir", "results/"],
+                    ["", "--input_data", os.path.join("sub", "b.tif"), "--output_dir", "results/"],
+                ],
+                argvs
+            )
+            other = tempfile.gettempdir()
+            argvs = self.generate_argvs(tmpdir, ["", "--output_dir=%s" % other, "--input_data", "*.tif"])
+            self.assertEqual([["", "--output_dir=%s" % other, "--input_data", "a.tif"]], argvs)
+
+    def test_first_pattern_on_command_line_defines_tasks(self):
+        # the solution declares output_data first, but input_data comes first on the command line
+        self.mock_solution("output_data", "input_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, os.path.join("raw", "s1", "img.tif"), os.path.join("results", "s1.tif"))
+            argvs = self.generate_argvs(
+                tmpdir, ["", "--input_data", "raw/*/*.tif", "--output_data", "results/*.tif"]
+            )
+        self.assertEqual(
+            [["", "--input_data", os.path.join("raw", "s1", "img.tif"),
+              "--output_data", os.path.join("results", "s1.tif")]],
+            argvs
+        )
+
+    def test_no_tasks_no_match(self):
+        self.mock_solution("input_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.png")
+            with self.assertLogs(get_active_logger(), level="WARNING") as cm:
+                argvs = self.generate_argvs(tmpdir, ["", "--input_data", "*.tif"])
+        self.assertEqual([], argvs)
+        self.assertIn(
+            "No tasks generated: none of the patterns matches an existing file or folder: --input_data '*.tif'.",
+            cm.output[0]
+        )
+
+    def test_no_tasks_not_derivable(self):
+        self.mock_solution("input_data", "output_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif")
+            with self.assertLogs(get_active_logger(), level="WARNING") as cm:
+                argvs = self.generate_argvs(tmpdir, ["", "--input_data", "*.tif", "--output_data", "out/*/*.tif"])
+        self.assertEqual([], argvs)
+        self.assertIn("No tasks generated: --output_data 'out/*/*.tif' does not match existing files", cm.output[0])
+
+    def test_text_with_wildcard_characters(self):
+        # values of string arguments that match no file and do not look like a path are no patterns
+        self.mock_solution(
+            {"name": "input_data", "type": "file"},
+            {"name": "prompt", "type": "string"},
+            {"name": "title"},
+            {"name": "count", "type": "integer"},
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif", "b.tif")
+            for text in ["Is this a cell?", "count cells in [nucleus]", "Sample [x]", "a*b"]:
+                argv = ["", "--input_data", "*.tif", "--prompt", text, "--title", text, "--count", "*"]
+                with self.assertLogs(get_active_logger(), level="INFO") as cm:
+                    argvs = self.generate_argvs(tmpdir, argv)
+                self.assertEqual(
+                    [
+                        ["", "--input_data", name, "--prompt", text, "--title", text, "--count", "*"]
+                        for name in ["a.tif", "b.tif"]
+                    ],
+                    argvs
+                )
+                self.assertIn(
+                    "--prompt '%s' matches no existing file and does not look like a path, passing it unchanged to "
+                    "every task." % text,
+                    "\n".join(cm.output)
+                )
+                self.assertNotIn("WARNING", "\n".join(cm.output))
+            # text before the pattern of the input files
+            argvs = self.generate_argvs(tmpdir, ["", "--prompt", "Is this a cell?", "--input_data", "*.tif"])
+            self.assertEqual(
+                [["", "--prompt", "Is this a cell?", "--input_data", name] for name in ["a.tif", "b.tif"]], argvs
+            )
+            # without any file pattern, the solution runs once
+            argvs = self.generate_argvs(tmpdir, ["", "--prompt", "Is this a cell?"])
+            self.assertEqual([["", "--prompt", "Is this a cell?"]], argvs)
+
+    def test_derive_typed_arguments(self):
+        self.mock_solution(
+            {"name": "input_data", "type": "string"},
+            {"name": "output_data", "type": "string"},
+            {"name": "output_dir", "type": "directory"},
+            {"name": "log", "type": "file"},
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif", "b.tif")
+            # string arguments are derived if they look like a path, file and directory arguments in any case
+            argvs = self.generate_argvs(
+                tmpdir,
+                ["", "--input_data", "*.tif", "--output_data", "*_out.tif", "--output_dir", "out_*", "--log", "log_*"]
+            )
+        self.assertEqual(
+            [
+                ["", "--input_data", "%s.tif" % name, "--output_data", "%s_out.tif" % name,
+                 "--output_dir", "out_%s" % name, "--log", "log_%s" % name]
+                for name in ["a", "b"]
+            ],
+            argvs
+        )
+
+    def test_no_tasks_first_pattern_does_not_match(self):
+        # a typo in the input pattern must not lead to tasks derived from the existing outputs
+        self.mock_solution("input_data", "output_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(
+                tmpdir, os.path.join("images", "a.tif"), os.path.join("images", "b.tif"),
+                os.path.join("out", "a.tif"), os.path.join("out", "b.tif"),
+            )
+            with self.assertLogs(get_active_logger(), level="WARNING") as cm:
+                argvs = self.generate_argvs(tmpdir, ["", "--input_data", "imgs/*.tif", "--output_data", "out/*.tif"])
+        self.assertEqual([], argvs)
+        self.assertIn(
+            "No tasks generated: the first pattern on the command line, --input_data 'imgs/*.tif', matches no "
+            "existing file or folder.",
+            cm.output[0]
+        )
+
+    def test_partially_overlapping_patterns(self):
+        # "*1.tif" matches a part of the files of "a*.tif", but is not more specific - no file is dropped
+        self.mock_solution("input_data", "reference")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a1.tif", "a2.tif", "b1.tif")
+            argvs = self.generate_argvs(tmpdir, ["", "--input_data", "a*.tif", "--reference", "*1.tif"])
+        self.assertEqual(
+            [
+                ["", "--input_data", input_data, "--reference", reference]
+                for input_data in ["a1.tif", "a2.tif"]
+                for reference in ["a1.tif", "b1.tif"]
+            ],
+            argvs
+        )
+
+    def test_more_specific_pattern(self):
+        # the results of a previous run match the input pattern, too - they are not used as inputs
+        self.mock_solution("input_data", "output_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif", "a_out.tif")
+            with self.assertLogs(get_active_logger(), level="INFO") as cm:
+                argvs = self.generate_argvs(tmpdir, ["", "--input_data", "*.tif", "--output_data", "*_out.tif"])
+        self.assertEqual([["", "--input_data", "a.tif", "--output_data", "a_out.tif"]], argvs)
+        self.assertIn(
+            "Not using 1 file(s) matched by --input_data that are also matched by a more specific pattern: a_out.tif",
+            "\n".join(cm.output)
+        )
+
+    def test_no_tasks_nothing_corresponds(self):
+        self.mock_solution("input_data", "mask")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, os.path.join("images", "a.tif"), os.path.join("masks", "x.png"))
+            with self.assertLogs(get_active_logger(), level="INFO") as cm:
+                argvs = self.generate_argvs(tmpdir, ["", "--input_data", "images/*.tif", "--mask", "masks/*.png"])
+        self.assertEqual([], argvs)
+        self.assertIn("pairing them by folder", cm.output[0])
+        self.assertIn(
+            "No tasks generated: none of the files matched by --input_data 'images/*.tif' has matching values for "
+            "--mask.",
+            cm.output[-1]
+        )
+
+
+class TestPatternMatching(unittest.TestCase):
+
+    def test_get_all_combinations_no_patterns(self):
+        res = list(get_all_combinations({"input": "a.tif", "output": None}, {"threads": "3"}))
+        self.assertEqual([{"input": "a.tif", "output": None, "threads": "3"}], res)
+
+    def test_get_all_combinations_derive(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif", os.path.join("sub", "b.tif"))
+            potential_list_args = {
+                "input": os.path.join(tmpdir, "**", "*.tif"),
+                "output": os.path.join(tmpdir, "out", "**", "*_out.tif"),
+                "log": os.path.join(tmpdir, "log.txt"),
+            }
+            res = list(get_all_combinations(potential_list_args, {"something": "bla"}))
+        self.assertEqual(
+            [
+                {
+                    "input": os.path.join(tmpdir, "a.tif"),
+                    "output": os.path.join(tmpdir, "out", "a_out.tif"),
+                    "log": os.path.join(tmpdir, "log.txt"),
+                    "something": "bla",
+                },
+                {
+                    "input": os.path.join(tmpdir, "sub", "b.tif"),
+                    "output": os.path.join(tmpdir, "out", "sub", "b_out.tif"),
+                    "log": os.path.join(tmpdir, "log.txt"),
+                    "something": "bla",
+                },
+            ],
+            res
+        )
+
+    def test_get_all_combinations_pair_by_name(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # names correspond via the wildcards, the folders differ
+            touch(
+                tmpdir, os.path.join("images", "img_1.tif"), os.path.join("images", "img_2.tif"),
+                os.path.join("labels", "lbl_2.png"), os.path.join("labels", "lbl_1.png"),
+            )
+            potential_list_args = {
+                "image": os.path.join(tmpdir, "images", "img_*.tif"),
+                "label": os.path.join(tmpdir, "labels", "lbl_*.png"),
+            }
+            res = list(get_all_combinations(potential_list_args, {}))
+        self.assertEqual(
+            [
+                {"image": os.path.join(tmpdir, "images", "img_%s.tif" % i),
+                 "label": os.path.join(tmpdir, "labels", "lbl_%s.png" % i)}
+                for i in [1, 2]
+            ],
+            res
+        )
+
+    def test_get_all_combinations_pair_by_folder(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # names do not correspond - fall back to pairing the files of the same folder
+            touch(
+                tmpdir, os.path.join("s1", "img.tif"), os.path.join("s1", "meta.json"),
+                os.path.join("s2", "img.tif"), os.path.join("s2", "meta.json"), os.path.join("s3", "img.tif"),
+            )
+            potential_list_args = {
+                "image": os.path.join(tmpdir, "*", "*.tif"),
+                "meta": os.path.join(tmpdir, "*", "*.json"),
+            }
+            with self.assertLogs(get_active_logger(), level="INFO") as cm:
+                res = list(get_all_combinations(potential_list_args, {}))
+        self.assertEqual(
+            [
+                {"image": os.path.join(tmpdir, s, "img.tif"), "meta": os.path.join(tmpdir, s, "meta.json")}
+                for s in ["s1", "s2"]
+            ],
+            res
+        )
+        self.assertIn("pairing them by folder", cm.output[0])
+        self.assertIn("Skipping 1 file(s) matched by --image without a matching value for --meta", cm.output[1])
+
+    def test_get_all_combinations_duplicate_derived_values(self):
+        # the tasks would overwrite each other's results: output/a.tif for s1/a.tif and s2/a.tif with "**",
+        # output/s1.tif for s1/a.tif and s1/b.tif with "*/*.tif" (the n-th wildcard gets the text of the n-th wildcard)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, os.path.join("s1", "a.tif"), os.path.join("s1", "b.tif"), os.path.join("s2", "a.tif"))
+            for input_pattern, output_pattern in [
+                (os.path.join(tmpdir, "**", "*.tif"), os.path.join(tmpdir, "output", "*.tif")),
+                (os.path.join(tmpdir, "*", "*.tif"), os.path.join(tmpdir, "output", "*.tif")),
+            ]:
+                potential_list_args = {"input": input_pattern, "output": output_pattern}
+                with self.assertLogs(get_active_logger(), level="WARNING") as cm:
+                    res = list(get_all_combinations(potential_list_args, {}))
+                self.assertEqual([], res)
+                self.assertIn(
+                    "No tasks generated: several tasks would use the same value for --output and overwrite each "
+                    "other's results: ",
+                    cm.output[0]
+                )
+
+    def test_get_all_combinations_shared_derived_folder(self):
+        # several tasks can write into the same folder
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, os.path.join("s1", "a.tif"), os.path.join("s1", "b.tif"))
+            input_pattern = os.path.join(tmpdir, "*", "*.tif")
+            expected = [
+                {"input": os.path.join(tmpdir, "s1", name), "output": os.path.join(tmpdir, "out", "s1") + os.sep}
+                for name in ["a.tif", "b.tif"]
+            ]
+            output_pattern = os.path.join(tmpdir, "out", "*", "")
+            res = list(get_all_combinations({"input": input_pattern, "output": output_pattern}, {}))
+            self.assertEqual(expected, res)
+            # an argument of type directory does not need the trailing separator
+            res = list(
+                get_all_combinations(
+                    {"input": input_pattern, "output": os.path.join(tmpdir, "out", "*")}, {}, {"output": "directory"}
+                )
+            )
+            self.assertEqual([dict(entry, output=entry["output"][:-1]) for entry in expected], res)
+
+
+@contextlib.contextmanager
+def working_directory(path):
+    cwd = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(cwd)
+
+
+def touch(folder, *names):
+    for name in names:
+        path = Path(folder).joinpath(name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@ import time
 import unittest
 
 from test_distributed.unit import test_argument_parsing, test_argument_matching, test_distributed_modes, \
-    test_mode_basic, test_mode_queue
+    test_mode_basic, test_mode_queue, test_path_pattern
 
 
 def main():
@@ -14,6 +14,7 @@ def main():
     suite.addTests(loader.loadTestsFromModule(test_distributed_modes))
     suite.addTests(loader.loadTestsFromModule(test_mode_basic))
     suite.addTests(loader.loadTestsFromModule(test_mode_queue))
+    suite.addTests(loader.loadTestsFromModule(test_path_pattern))
 
     runner = unittest.TextTestRunner(verbosity=3)
     result = runner.run(suite)
