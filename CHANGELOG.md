@@ -23,8 +23,18 @@ We use the following:
 
 ### Changed
 
+- matching of several pattern arguments: one task is generated per file matched by the first pattern on the command
+  line, which has to match existing files (a warning names it otherwise); other patterns that match existing files are
+  paired with it by corresponding names (e.g. `a.tif` / `a_out.tif`, files without an existing counterpart get the
+  derived value), pairing by folder is only used if no names correspond; files of the first pattern that a more
+  specific pattern matches as well (like the `*_out.tif` results of a previous run for `*.tif`) are not used for the
+  first pattern
 - `--mode` only accepts the implemented modes (`basic`, `queue`); the `queue` mode is listed in the help, and an
   unknown mode is an error instead of silently doing nothing
+
+### Removed
+
+- `argument_matching.expand_args` (internal helper, replaced by `path_pattern.PathPattern`)
 
 ### Fixed
 
@@ -44,6 +54,17 @@ We use the following:
 - README: patterns are quoted in all examples (unquoted patterns are expanded by the shell before album sees them),
   the wrong advice to replace slashes with backslashes on Windows is replaced, and the `queue` mode and the exit
   status are documented
+- patterns that do not match existing files yet, like the documented `--output_data '*_out.tif'`,
+  `--output_data 'output/*.tif'` and `--output_data '**/*_out.tif'`, generated no tasks at all; their values are
+  derived from the matched files again (the wildcards are replaced by what the corresponding wildcards matched, `**`
+  keeps the sub folders); if several tasks would get the same derived value and overwrite each other's results, no
+  task is generated
+- a value with `*`, `?` or `[` that is not meant as a pattern, like `--prompt 'Is this a cell?'`, generated no tasks
+  next to a file pattern; a value that matches no file is now passed unchanged unless the argument is of type `file`
+  or `directory` or the value looks like a path (contains a `/` or ends with a file extension)
+- an argument without pattern in another folder than the matched files (e.g. `--output results/`) generated no tasks;
+  arguments without pattern are now passed unchanged to every task
+- a warning explains why no task was generated
 
 ## [0.2.1]
 

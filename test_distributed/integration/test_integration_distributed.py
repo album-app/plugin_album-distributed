@@ -1,3 +1,4 @@
+import os
 import sys
 import tempfile
 import unittest
@@ -155,6 +156,46 @@ class TestIntegrationExampleCommand(unittest.TestCase):
                 self.assertIn(
                     "Running run-mock with args (\'solution.py\', False, ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun']).." % (
                         str(inputfile2).replace('\\', '\\\\'), str(outputfile2).replace('\\', '\\\\')), cm.output[3])
+
+    def test_run_basic_dry_run_derived_output(self):
+        # mocks
+        collection_entry = mock.create_autospec(ICollectionSolution)
+        solution_setup = {"args": [{"name": "input_data"}, {"name": "output_data"}]}
+        loaded_solution = mock.create_autospec(ISolution)
+        loaded_solution.setup = mock.MagicMock(return_value=solution_setup)
+        collection_entry.setup = mock.MagicMock(return_value=solution_setup)
+        resolve_result = ResolveResult("", None, collection_entry, None, loaded_solution)
+        resolve_result.coordinates = mock.MagicMock()
+        resolve_result.coordinates.return_value = "my-group:my-solution:my-version"
+        self.album.resolve = MagicMock(return_value=resolve_result)
+
+        run_mock = mock.MagicMock()
+        run_mock.__name__ = "run-mock"
+        self.album._controller.run_manager().run = run_mock
+
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            Path(tmpdirname).joinpath("a.tif").touch()
+            Path(tmpdirname).joinpath("b.tif").touch()
+            cwd = os.getcwd()
+            os.chdir(tmpdirname)
+            try:
+                with self.assertLogs(get_active_logger(), level='INFO') as cm:
+                    # run - the outputs do not exist yet and are derived from the inputs
+                    sys.argv = ["", "run-distributed", "solution.py", "--input_data", "*.tif",
+                                "--output_data", "output/*_out.tif", "--dry-run"]
+                    self.assertIsNone(main())
+            finally:
+                os.chdir(cwd)
+
+            # assert - the dry run lists the argv of each task
+            run_mock.assert_not_called()
+            self.assertEqual(4, len(cm.output))
+            for i, name in enumerate(["a", "b"]):
+                self.assertIn(
+                    "Would run run-mock with args ('solution.py', False, "
+                    "['', '--input_data', '%s.tif', '--output_data', 'output/%s_out.tif']).." % (name, name),
+                    cm.output[2 + i]
+                )
 
     def test_run_queue(self):
         # mocks
