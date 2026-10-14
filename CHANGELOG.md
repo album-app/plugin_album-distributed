@@ -20,6 +20,7 @@ We use the following:
 
 - after running the tasks, a summary with the number of succeeded / failed / not run tasks and the arguments of the
   failed tasks is logged (`basic` and `queue` mode)
+- `--install` installs the solution first if it is not installed, like `album run --install`
 
 ### Changed
 
@@ -65,6 +66,10 @@ We use the following:
 - an argument without pattern in another folder than the matched files (e.g. `--output results/`) generated no tasks;
   arguments without pattern are now passed unchanged to every task
 - a warning explains why no task was generated
+- a solution that is not installed: with a path, the command failed with `'NoneType' object has no attribute 'setup'`
+  (even with `--dry-run`), with `group:name:version` every task failed. `--dry-run` lists the tasks now without an
+  installed solution; otherwise the command fails before running any task and explains how to install the solution
+- README: rewritten as use cases with the tasks each command generates
 
 ## [0.2.1]
 

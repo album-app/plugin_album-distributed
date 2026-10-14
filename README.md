@@ -1,5 +1,7 @@
-# Album plugin for distributed calls 
-This is an early version of enhancing album with calls for batch and distributed processing.
+# Album plugin for distributed calls
+Run an Album solution on many inputs with one command: `album run-distributed` turns file patterns such as `"*.tif"`
+into one task per matching file and runs the tasks one after another or in parallel threads, on the machine where you
+call it.
 
 ## Installation
 1. [install Album](https://docs.album.solutions/en/latest/installation-instructions.html#)
@@ -15,123 +17,128 @@ Or via pip:
 ```
 pip install album-distributed
 ```
-
 ## Usage
-First, install a solution - replace `solution.py` with the path to your solution / solution folder or with the `group:name:version` coordinates of your solution.
+In the examples, replace `solution.py` with the path of your solution file or folder, or with the
+`group:name:version` coordinates of your solution.
+
+First, list the tasks that would run - `--dry-run` does not run anything:
 ```
-album install solution.py
+album run-distributed solution.py --input_data "*.tif" --dry-run
 ```
-Now you can use the plugin:
+Then run them:
 ```
-album run-distributed solution.py
+album run-distributed solution.py --input_data "*.tif" --install
 ```
-The plugin does two things:
-1. It figures out if the input arguments match multiple tasks - in this case, it generates the different task arguments.
-2. It runs all matching tasks, the mode for running these tasks can be chosen.  
+Like `album run`, `run-distributed` runs installed solutions. `--install` installs the solution first if it is not
+installed yet. Alternatively, install it once with `album install solution.py`.
 
-Since the matching part can be tricky, please use the `--dry-run` argument to first print a list of matched tasks:
+- Put patterns in double quotes. Otherwise your shell replaces `*.tif` with the file names before Album sees the
+  pattern.
+- Spell out argument names in full: `--input_data "*.tif"` or `--input_data="*.tif"`.
+- Use `/` in patterns, on Windows too.
+
+## Use cases
+Replace `input_data`, `output_data` and the other argument names with the arguments of your solution. Patterns use
+the [`glob`](https://docs.python.org/3/library/glob.html) syntax.
+
+### Process every file in a folder
 ```
-album run-distributed solution.py --dry-run
-```
-
-Always put patterns in quotes, as in the examples on this page. Otherwise your shell (e.g. bash or zsh) replaces the pattern with the matching file names before album sees it: `--input_data *.tif` becomes `--input_data a.tif b.tif c.tif`, which does not generate one task per file.
-In the Windows Command Prompt (`cmd.exe`), single quotes are not removed - use double quotes (`"*.tif"`) there.
-
-Arguments can be passed as `--input_data '*.tif'` or `--input_data='*.tif'`. Please spell out the full argument name - abbreviated argument names cannot be replaced with the matched values and result in an error.
-
-On Windows, both `/` and `\` can be used as path separators in patterns, there is no need to replace the slashes in the examples on this page. Prefer `/`: it works in every shell, while `\` has to be quoted or escaped in Git Bash and other POSIX shells.
-
-Please let us know if you run into issues.
-
-## Matching input arguments
-To generate multiple tasks, patterns in file name arguments can be used to match multiple files.
-
-### Using patterns in a single argument
-
-You should be able to use all [`glob`](https://docs.python.org/3/library/glob.html) features when using it in a single argument. Here are some examples:
-
-In the following scenarios `solution.py` has an argument called `input_data`.
-
-Match all `.tif` files in the current folder:
-```
-album run-distributed solution.py --input_data '*.tif'
+album run-distributed solution.py --input_data "*.tif"
 ```
 
-Match all `.tif` files in a specific folder where the file name starts with `input`:
+| Task | `--input_data` |
+|------|----------------|
+| 1    | `a.tif`        |
+| 2    | `b.tif`        |
+
+Other patterns:
+- `"data/input*.tif"` - the files in the `data` folder whose names start with `input`
+- `"**/*.tif"` - all `.tif` files in the current folder and its sub folders
+
+### Write each result next to its input
 ```
-album run-distributed solution.py --input_data '/data/input*.tif'
+album run-distributed solution.py --input_data "*.tif" --output_data "*_out.tif"
 ```
 
-Match all `.tif` files recursively, starting from the current folder:
+| Task | `--input_data` | `--output_data` |
+|------|----------------|-----------------|
+| 1    | `a.tif`        | `a_out.tif`     |
+| 2    | `b.tif`        | `b_out.tif`     |
+
+The `*` in `*_out.tif` is replaced with what the `*` in `*.tif` matched. If you run the command again, the
+`*_out.tif` files are not used as inputs - all inputs are processed again and their results are overwritten.
+
+### Write the results into another folder
 ```
-album run-distributed solution.py --input_data '**/*.tif'
+album run-distributed solution.py --input_data "*.tif" --output_data "output/*.tif"
 ```
 
-### Using patterns in multiple arguments
+| Task | `--input_data` | `--output_data` |
+|------|----------------|-----------------|
+| 1    | `a.tif`        | `output/a.tif`  |
+| 2    | `b.tif`        | `output/b.tif`  |
 
-When using patterns in multiple arguments, this plugin figures out the corresponding argument values based on which of the patterns match with existing files:
-- One task is generated for each file matched by the first pattern on the command line. This pattern has to match existing files - if it does not (e.g. because of a typo), no task is generated.
-- A pattern that does not match any existing file (e.g. the output files that do not exist yet) is derived from the matched file: each wildcard is replaced by the text the corresponding wildcard matched, in order. With `--input_data '*.tif'` matching `a.tif`, `*_out.tif` becomes `a_out.tif` and `output/*.tif` becomes `output/a.tif`. A `**` is replaced by the sub folders matched by the `**` of the first pattern.
-- If several tasks would get the same derived value, no task is generated, since the tasks would overwrite each other's results. Example: `--input_data '**/*.tif' --output_data 'output/*.tif'` with an `a.tif` in two folders - use `output/**/*.tif` to keep the sub folders. A derived folder (a pattern ending with `/` or an argument of type `directory`) can be used by several tasks.
-- A pattern that matches existing files is paired with the files of the first pattern by name in the same way (`a.tif` with `a_out.tif`). Files without an existing counterpart get the derived value, and a warning lists these values. Only if none of the names correspond, the files in the same folder are combined; files without a counterpart in their folder are skipped with a warning.
-- If another pattern matches a part of the files of the first pattern, these files are not used for the first pattern, e.g. `--input_data '*.tif'` does not pick up the `*_out.tif` files of a previous run.
-- Values are only derived for arguments of type `file` or `directory` and for values that look like a path - with a `/` or a file extension, like `output/*` or `*_out.tif`. Other values that contain `*`, `?` or `[` and match no file, like `--prompt 'Is this a cell?'`, are passed unchanged to every task.
-- Arguments without a pattern are passed unchanged to every task.
-
-If no task can be generated, a warning explains why. Please use the `--dry-run` argument to test if the matched tasks correspond with your expectation.
-
-In the following scenarios `solution.py` has two arguments called `input_data` and `output_data`.
-
-Use all `.tif` files in the current folder and append `_out` to the file name for the output argument.
+To keep the sub folders of the inputs, use `**` in both patterns:
 ```
-album run-distributed solution.py --input_data '*.tif' --output_data '*_out.tif'
+album run-distributed solution.py --input_data "**/*.tif" --output_data "output/**/*.tif"
 ```
 
-Do the same thing recursively:
+| Task | `--input_data` | `--output_data`  |
+|------|----------------|------------------|
+| 1    | `a.tif`        | `output/a.tif`   |
+| 2    | `x/b.tif`      | `output/x/b.tif` |
+
+`run-distributed` does not create the `output` folder - create it first, unless your solution does.
+
+### Pair the files of two inputs
+For example, process each image with its mask (`images/a.tif` with `masks/a_mask.tif`):
 ```
-album run-distributed solution.py --input_data '**/*.tif' --output_data '**/*_out.tif'
+album run-distributed solution.py --image "images/*.tif" --mask "masks/*_mask.tif" --output_data "results/*.tif"
 ```
 
-Let the output argument values live in a different folder (the plugin does not create the `output` folder):
+| Task | `--image`      | `--mask`           | `--output_data` |
+|------|----------------|--------------------|-----------------|
+| 1    | `images/a.tif` | `masks/a_mask.tif` | `results/a.tif` |
+| 2    | `images/b.tif` | `masks/b_mask.tif` | `results/b.tif` |
+
+The files are paired by name. Put the main input first: one task is generated for each file of the first pattern.
+
+### Use the same value for every task
 ```
-album run-distributed solution.py --input_data '*.tif' --output_data 'output/*.tif'
+album run-distributed solution.py --input_data "*.tif" --model "models/model.pt"
 ```
 
-Keep the sub folders of the input files in the output folder:
-```
-album run-distributed solution.py --input_data '**/*.tif' --output_data 'output/**/*.tif'
-```
+| Task | `--input_data` | `--model`         |
+|------|----------------|-------------------|
+| 1    | `a.tif`        | `models/model.pt` |
+| 2    | `b.tif`        | `models/model.pt` |
 
-Use the same value for every task - an argument without pattern is passed unchanged:
-```
-album run-distributed solution.py --input_data '*.tif' --output_data results/
-```
+Arguments without a pattern are passed unchanged to every task.
 
-Since Album does not yet distinguish between input and output arguments, be aware that if the `output_data` pattern in these scenarios matches existing files (e.g. from a previous run), the existing files are paired with the input files by name, and input files without an existing output file get the derived value: running the same command again processes all input files again and overwrites the existing results. In the same way, if an input pattern (e.g. one mask per image) matches only some of the corresponding files, the other tasks get the derived name of a file that does not exist - a warning lists these values. Check the tasks with `--dry-run`. We will work on improving this.
+### Run the tasks in parallel
+```
+album run-distributed solution.py --input_data "*.tif" --mode queue --threads 4
+```
+See [Modes](#modes).
 
 ## Modes
-You can set the mode by using the `--mode` argument. The available modes are `basic` and `queue`:
-```
-album run-distributed solution.py --mode queue
-```
-By default, the plugin will use the `basic` mode. Other values for `--mode` are rejected with an error.
+Choose how the tasks run with `--mode`:
 
-### Basic
-In this mode, all tasks will be performed one after each other. The console output of each task will be printed.
-The plugin stops at the first failing task.
-### Queue
-In this mode, a set of thread workers will be created to process tasks in parallel. The console output of each task will not be printed.
-All tasks are processed, even if some of them fail.
-You can control how many threads should be created with the `--threads` argument (default: 3, at least 1):
-```
-album run-distributed solution.py --mode queue --threads 16
-```
+| Mode              | How the tasks run                                                       | If a task fails                 |
+|-------------------|-------------------------------------------------------------------------|---------------------------------|
+| `basic` (default) | one after another, with the output of each task                         | the remaining tasks are not run |
+| `queue`           | in parallel, in `--threads` worker threads (default: 3), without output | the other tasks still run       |
 
-## Exit status
-After running the tasks, the plugin logs a summary with the number of succeeded, failed and not run tasks and lists the arguments of the failed tasks.
-If a task failed, `album run-distributed` exits with a non-zero exit status:
-- In `basic` mode, the remaining tasks are not run and the command fails with the error of the failing task.
-- In `queue` mode, all tasks are processed first, then the command fails with `album command failed: N of M task(s) failed.`
+At the end, a summary lists the succeeded and failed tasks. If a task failed, the command exits with a non-zero
+status.
 
-With `--dry-run`, no task is run - the generated tasks are only listed.
-If no task is generated, a warning explains why and the command exits with status 0.
+All threads run on the machine where you call the command and use the same solution environment - choose `--threads`
+by the CPU, memory and GPU resources each task needs.
+
+## How patterns are matched
+- Patterns work in arguments of type `file`, `directory` and `string`, and in arguments without a type.
+- One task is generated for each file matched by the first pattern on the command line.
+- In the other patterns, each wildcard is replaced with what the corresponding wildcard matched in that file; `**`
+  keeps the sub folders.
+- Existing files matched by the other patterns are paired with that file by name.
+- If no task can be generated, a warning explains why. Check the tasks with `--dry-run`.

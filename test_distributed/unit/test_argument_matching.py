@@ -127,6 +127,17 @@ class TestReverseGlob(unittest.TestCase):
                 tasks[1], "solution.py", ['', '', '--input', str(inputfile2), '--output', str(outputfile2)]
             )
 
+    def test__generate_run_tasks_not_installed(self):
+        # a solution that is not installed has no collection entry, the arguments are taken from the solution file
+        loaded_solution = mock.create_autospec(ISolution)
+        loaded_solution.setup = mock.MagicMock(return_value={"args": [{"name": "input", "type": "file"}]})
+        self.album.resolve = MagicMock(return_value=ResolveResult("", None, None, None, loaded_solution))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif", "b.tif")
+            argvs = self.generate_argvs(tmpdir, ["", "--input", "*.tif"])
+        self.assertEqual([["", "--input", "a.tif"], ["", "--input", "b.tif"]], argvs)
+
     def test__generate_run_tasks_with_magic_equals_syntax(self):
         collection_entry = mock.create_autospec(ICollectionSolution)
         solution_setup = {"args": [{"name": "input"}, {"name": "other"}]}
@@ -357,6 +368,38 @@ class TestReverseGlob(unittest.TestCase):
             [
                 ["", "--input_data", "a.tif", "--output_data", "a_out.tif"],
                 ["", "--input_data", "b.tif", "--output_data", "b_out.tif"],
+            ],
+            argvs
+        )
+
+    def test_readme_pair_two_inputs(self):
+        self.mock_solution("image", "mask", "output_data")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, os.path.join("images", "a.tif"), os.path.join("images", "b.tif"),
+                  os.path.join("masks", "a_mask.tif"), os.path.join("masks", "b_mask.tif"))
+            argvs = self.generate_argvs(
+                tmpdir,
+                ["", "--image", "images/*.tif", "--mask", "masks/*_mask.tif", "--output_data", "results/*.tif"]
+            )
+        self.assertEqual(
+            [
+                ["", "--image", os.path.join("images", "a.tif"), "--mask", os.path.join("masks", "a_mask.tif"),
+                 "--output_data", "results/a.tif"],
+                ["", "--image", os.path.join("images", "b.tif"), "--mask", os.path.join("masks", "b_mask.tif"),
+                 "--output_data", "results/b.tif"],
+            ],
+            argvs
+        )
+
+    def test_readme_same_value_for_every_task(self):
+        self.mock_solution("input_data", "model")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            touch(tmpdir, "a.tif", "b.tif", os.path.join("models", "model.pt"))
+            argvs = self.generate_argvs(tmpdir, ["", "--input_data", "*.tif", "--model", "models/model.pt"])
+        self.assertEqual(
+            [
+                ["", "--input_data", "a.tif", "--model", "models/model.pt"],
+                ["", "--input_data", "b.tif", "--model", "models/model.pt"],
             ],
             argvs
         )
