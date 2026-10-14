@@ -7,6 +7,7 @@ from album.api import Album
 from album.core.api.model.collection_solution import ICollectionSolution
 
 from album.distributed import distributed_modes
+from album.runner.album_logging import get_active_logger
 import sys
 import tempfile
 import unittest
@@ -24,6 +25,9 @@ class TestDistributedModes(unittest.TestCase):
         self.setup_tmp_resources()
         self.setup_album_instance()
         self.setup_collection(init_catalogs=False, init_collection=True)
+        # the mocked solutions count as installed, the tests of a not installed solution override this
+        self.album.is_installed = MagicMock(return_value=True)
+        self.album.install = MagicMock()
 
     def setup_tmp_resources(self):
         self.tmp_dir = tempfile.TemporaryDirectory()
@@ -92,6 +96,73 @@ class TestDistributedModes(unittest.TestCase):
         with self.assertRaises(ValueError):
             distributed_modes.run(self.album, Namespace(solution='solution.py', mode='bogus'))
         generate_run_tasks_mock.assert_not_called()
+
+    @patch('album.distributed.distributed_modes.mode_basic.run')
+    @patch('album.distributed.distributed_modes.generate_run_tasks', return_value=[MagicMock()])
+    def test_run_not_installed(self, _, run_mock):
+        self.album.is_installed = MagicMock(return_value=False)
+        with self.assertRaises(LookupError) as context:
+            distributed_modes.run(self.album, Namespace(solution='solution.py', mode='basic', dry_run=False,
+                                                        install=False))
+        self.assertEqual(
+            'Solution "solution.py" is not installed. Install it with "album install solution.py" or pass --install.',
+            str(context.exception)
+        )
+        self.album.install.assert_not_called()
+        run_mock.assert_not_called()
+
+    @patch('album.distributed.distributed_modes.mode_basic.run')
+    @patch('album.distributed.distributed_modes.generate_run_tasks', return_value=[MagicMock()])
+    def test_run_install(self, _, run_mock):
+        self.album.is_installed = MagicMock(return_value=False)
+        # the solution is installed before the tasks run
+        self.album.install.side_effect = lambda solution: run_mock.assert_not_called()
+        distributed_modes.run(self.album, Namespace(solution='solution.py', mode='basic', dry_run=False,
+                                                    install=True))
+        self.album.install.assert_called_once_with('solution.py')
+        run_mock.assert_called_once()
+
+    @patch('album.distributed.distributed_modes.mode_basic.run')
+    @patch('album.distributed.distributed_modes.generate_run_tasks', return_value=[MagicMock()])
+    def test_run_install_already_installed(self, _, run_mock):
+        distributed_modes.run(self.album, Namespace(solution='solution.py', mode='basic', dry_run=False,
+                                                    install=True))
+        self.album.install.assert_not_called()
+        run_mock.assert_called_once()
+
+    @patch('album.distributed.distributed_modes.mode_basic.run')
+    @patch('album.distributed.distributed_modes.generate_run_tasks', return_value=[MagicMock()])
+    def test_run_dry_run_not_installed(self, _, run_mock):
+        self.album.is_installed = MagicMock(return_value=False)
+        # the dry run lists the tasks and points out that the solution has to be installed
+        with self.assertLogs(get_active_logger(), level='WARNING') as cm:
+            distributed_modes.run(self.album, Namespace(solution='solution.py', mode='basic', dry_run=True,
+                                                        install=False))
+        self.assertIn('Solution "solution.py" is not installed.', cm.output[0])
+        self.album.install.assert_not_called()
+        run_mock.assert_called_once()
+
+    @patch('album.distributed.distributed_modes.mode_basic.run')
+    @patch('album.distributed.distributed_modes.generate_run_tasks', return_value=[MagicMock()])
+    def test_run_dry_run_install(self, _, run_mock):
+        self.album.is_installed = MagicMock(return_value=False)
+        # the dry run does not install the solution
+        with self.assertLogs(get_active_logger(), level='INFO') as cm:
+            distributed_modes.run(self.album, Namespace(solution='solution.py', mode='basic', dry_run=True,
+                                                        install=True))
+        self.assertIn('Would install solution "solution.py" before running the tasks.', cm.output[0])
+        self.album.install.assert_not_called()
+        run_mock.assert_called_once()
+
+    @patch('album.distributed.distributed_modes.mode_basic.run')
+    @patch('album.distributed.distributed_modes.generate_run_tasks', return_value=[])
+    def test_run_no_tasks_not_installed(self, _, run_mock):
+        # without tasks nothing runs, so the solution does not have to be installed
+        self.album.is_installed = MagicMock(return_value=False)
+        distributed_modes.run(self.album, Namespace(solution='solution.py', mode='basic', dry_run=False,
+                                                    install=False))
+        self.album.install.assert_not_called()
+        run_mock.assert_called_once()
 
     def test_get_run_mode_choices(self):
         self.assertEqual(["basic", "queue"], distributed_modes.get_run_mode_choices())

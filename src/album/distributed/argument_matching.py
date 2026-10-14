@@ -20,11 +20,12 @@ _FILE_EXTENSION_REGEX = re.compile(r"\.[A-Za-z0-9]+$")
 
 
 def generate_run_tasks(album_instance: Album, solution: str, argv):
-    resolved_solution = album_instance.resolve(solution)
-    args = __parse_args(resolved_solution.loaded_solution(), argv)[0]
+    # the arguments are taken from the solution file - generating the tasks does not need an installed solution
+    loaded_solution = album_instance.resolve(solution).loaded_solution()
+    args = __parse_args(loaded_solution, argv)[0]
     run_method = album_instance._controller.run_manager().run
     res = []
-    solution_args = resolved_solution.database_entry().setup()["args"]
+    solution_args = loaded_solution.setup()["args"]
     solution_args_dict = {}
     for solution_arg in solution_args:
         solution_args_dict[solution_arg["name"]] = solution_arg

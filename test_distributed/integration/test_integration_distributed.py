@@ -23,6 +23,8 @@ class TestIntegrationExampleCommand(unittest.TestCase):
         self.setup_tmp_resources()
         self.setup_album_instance()
         self.setup_collection(init_catalogs=False)
+        # the mocked solutions count as installed
+        self.album.is_installed = MagicMock(return_value=True)
 
     def setup_tmp_resources(self):
         self.tmp_dir = tempfile.TemporaryDirectory()
@@ -241,6 +243,82 @@ class TestIntegrationExampleCommand(unittest.TestCase):
             self.assertIsNotNone(exit_context.exception.code)
             self.assertTrue(any("Summary: 0 of 1 task(s) succeeded, 1 failed." in line for line in cm.output))
             self.assertIn("album command failed: 1 of 1 task(s) failed.", cm.output[-1])
+
+
+SOLUTION = """
+from album.runner.api import setup
+
+setup(
+    group="group",
+    name="name",
+    version="0.1.0",
+    album_api_version="0.5.1",
+    args=[{"name": "input", "type": "file", "description": "The input file."}],
+)
+"""
+
+
+class TestIntegrationNotInstalledSolution(unittest.TestCase):
+    """Call run-distributed with the path of a solution that is not installed, without mocking the resolving."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        with patch("album.api.configure_root_logger"):
+            self.album = Album.Builder().base_cache_path(Path(self.tmp_dir.name, "album")).build()
+        with patch("album.core.model.configuration.Configuration.get_initial_catalogs", return_value={}):
+            self.album._controller.collection_manager().load_or_create()
+        self.album_patch = patch("album.argument_parsing.create_album_instance", return_value=self.album)
+        self.album_patch.start()
+
+        self.solution = str(Path(self.tmp_dir.name, "solution.py"))
+        Path(self.solution).write_text(SOLUTION)
+        self.input_pattern = str(Path(self.tmp_dir.name, "*.tif"))
+        Path(self.tmp_dir.name, "a.tif").touch()
+        Path(self.tmp_dir.name, "b.tif").touch()
+
+        self.run_mock = mock.MagicMock()
+        self.run_mock.__name__ = "run-mock"
+        self.album._controller.run_manager().run = self.run_mock
+        self.album.install = MagicMock()
+
+    def tearDown(self) -> None:
+        self.album_patch.stop()
+        super().tearDown()
+
+    def test_dry_run(self):
+        self.assertFalse(self.album.is_installed(self.solution))
+        with self.assertLogs(get_active_logger(), level='INFO') as cm:
+            sys.argv = ["", "run-distributed", self.solution, "--input", self.input_pattern, "--dry-run"]
+            self.assertIsNone(main())
+
+        # the tasks are listed, the solution is neither installed nor run
+        self.assertEqual(2, len([line for line in cm.output if "Would run run-mock" in line]))
+        self.assertTrue(any('Solution "%s" is not installed.' % self.solution in line for line in cm.output))
+        self.album.install.assert_not_called()
+        self.run_mock.assert_not_called()
+
+    def test_run_not_installed(self):
+        with self.assertLogs(get_active_logger(), level='INFO') as cm:
+            sys.argv = ["", "run-distributed", self.solution, "--input", self.input_pattern]
+            with self.assertRaises(SystemExit) as exit_context:
+                main()
+
+        # the command fails before running any task
+        self.assertNotEqual(0, exit_context.exception.code)
+        self.assertIn(
+            'album command failed: Solution "%s" is not installed. Install it with "album install %s" or pass '
+            '--install.' % (self.solution, self.solution), cm.output[-1]
+        )
+        self.run_mock.assert_not_called()
+
+    def test_run_install(self):
+        sys.argv = ["", "run-distributed", self.solution, "--input", self.input_pattern, "--install"]
+        self.assertIsNone(main())
+
+        # the solution is installed once, then the tasks run
+        self.album.install.assert_called_once_with(self.solution)
+        self.assertEqual(2, self.run_mock.call_count)
 
 
 if __name__ == '__main__':

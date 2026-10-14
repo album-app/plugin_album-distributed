@@ -32,6 +32,11 @@ class TestArgumentParsing(unittest.TestCase):
             parser.parse_known_args(["run-distributed", "1234", "--mode", "bogus"])
         self.assertIn("invalid choice: 'bogus'", output.getvalue())
 
+    def test_create_parser_install(self):
+        parser = create_parser()
+        self.assertFalse(parser.parse_known_args(["run-distributed", "1234"])[0].install)
+        self.assertTrue(parser.parse_known_args(["run-distributed", "1234", "--install"])[0].install)
+
     def test_create_parser_threads(self):
         parser = create_parser()
         self.assertEqual(3, parser.parse_known_args(["run-distributed", "1234"])[0].threads)
