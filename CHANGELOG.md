@@ -32,6 +32,7 @@ We use the following:
   first pattern
 - `--mode` only accepts the implemented modes (`basic`, `queue`); the `queue` mode is listed in the help, and an
   unknown mode is an error instead of silently doing nothing
+- Python 3.14 is listed among the supported Python versions; the CI tests it
 
 ### Removed
 
