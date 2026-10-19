@@ -35,7 +35,7 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "album>=0.12.0,<0.13.0",
+    "album>=1.0.0,<2.0.0",
 ]
 
 [tool.setuptools.packages.find]

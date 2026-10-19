@@ -33,6 +33,7 @@ We use the following:
 - `--mode` only accepts the implemented modes (`basic`, `queue`); the `queue` mode is listed in the help, and an
   unknown mode is an error instead of silently doing nothing
 - Python 3.14 is listed among the supported Python versions; the CI tests it
+- requires album 1.0 (`album>=1.0.0,<2.0.0`, was `album>=0.12.0,<0.13.0`)
 
 ### Removed
 
