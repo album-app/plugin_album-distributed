@@ -36,6 +36,7 @@ We use the following:
   unknown mode is an error instead of silently doing nothing
 - Python 3.14 is listed among the supported Python versions; the CI tests it
 - requires album 1.0 (`album>=1.0.0,<2.0.0`, was `album>=0.12.0,<0.13.0`)
+- requires Python 3.11 or newer (was 3.10), as album 1.0 does
 
 ### Removed
 
