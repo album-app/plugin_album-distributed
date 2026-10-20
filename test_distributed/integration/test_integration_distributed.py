@@ -1,3 +1,4 @@
+import os
 import sys
 import tempfile
 import unittest
@@ -22,6 +23,8 @@ class TestIntegrationExampleCommand(unittest.TestCase):
         self.setup_tmp_resources()
         self.setup_album_instance()
         self.setup_collection(init_catalogs=False)
+        # the mocked solutions count as installed
+        self.album.is_installed = MagicMock(return_value=True)
 
     def setup_tmp_resources(self):
         self.tmp_dir = tempfile.TemporaryDirectory()
@@ -80,7 +83,7 @@ class TestIntegrationExampleCommand(unittest.TestCase):
 
             # assert
             self.assertEqual(3, len(cm.output))
-            self.assertIn("Would run run-mock with args (\'solution.py\', [\'\'], False)..", cm.output[2])
+            self.assertIn("Would run run-mock with args (\'solution.py\', False, [\'\'])..", cm.output[2])
 
     def test_run_basic(self):
         # mocks
@@ -98,9 +101,10 @@ class TestIntegrationExampleCommand(unittest.TestCase):
             self.assertIsNone(main())
 
             # assert
-            self.assertEqual(3, len(cm.output))
-            self.assertIn("Running run-mock with args (\'solution.py\', [\'\'], False)..", cm.output[2])
-            run_mock.assert_called_with("solution.py", [""], False)
+            self.assertEqual(4, len(cm.output))
+            self.assertIn("Summary: 1 of 1 task(s) succeeded, 0 failed.", cm.output[3])
+            self.assertIn("Running run-mock with args (\'solution.py\', False, [\'\'])..", cm.output[2])
+            run_mock.assert_called_with("solution.py", False, [""])
 
     def test_run_basic_with_magic(self):
         # mocks
@@ -146,13 +150,54 @@ class TestIntegrationExampleCommand(unittest.TestCase):
                 self.assertIsNone(main())
 
                 # assert
-                self.assertEqual(4, len(cm.output))
+                self.assertEqual(5, len(cm.output))
+                self.assertIn("Summary: 2 of 2 task(s) succeeded, 0 failed.", cm.output[4])
                 self.assertIn(
-                    "Running run-mock with args (\'solution.py\', ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun'], False).." % (
+                    "Running run-mock with args (\'solution.py\', False, ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun']).." % (
                         str(inputfile1).replace('\\', '\\\\'), str(outputfile1).replace('\\', '\\\\')), cm.output[2])
                 self.assertIn(
-                    "Running run-mock with args (\'solution.py\', ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun'], False).." % (
+                    "Running run-mock with args (\'solution.py\', False, ['', '--input', \'%s\', '--output', \'%s\', '--other', 'sun']).." % (
                         str(inputfile2).replace('\\', '\\\\'), str(outputfile2).replace('\\', '\\\\')), cm.output[3])
+
+    def test_run_basic_dry_run_derived_output(self):
+        # mocks
+        collection_entry = mock.create_autospec(ICollectionSolution)
+        solution_setup = {"args": [{"name": "input_data"}, {"name": "output_data"}]}
+        loaded_solution = mock.create_autospec(ISolution)
+        loaded_solution.setup = mock.MagicMock(return_value=solution_setup)
+        collection_entry.setup = mock.MagicMock(return_value=solution_setup)
+        resolve_result = ResolveResult("", None, collection_entry, None, loaded_solution)
+        resolve_result.coordinates = mock.MagicMock()
+        resolve_result.coordinates.return_value = "my-group:my-solution:my-version"
+        self.album.resolve = MagicMock(return_value=resolve_result)
+
+        run_mock = mock.MagicMock()
+        run_mock.__name__ = "run-mock"
+        self.album._controller.run_manager().run = run_mock
+
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            Path(tmpdirname).joinpath("a.tif").touch()
+            Path(tmpdirname).joinpath("b.tif").touch()
+            cwd = os.getcwd()
+            os.chdir(tmpdirname)
+            try:
+                with self.assertLogs(get_active_logger(), level='INFO') as cm:
+                    # run - the outputs do not exist yet and are derived from the inputs
+                    sys.argv = ["", "run-distributed", "solution.py", "--input_data", "*.tif",
+                                "--output_data", "output/*_out.tif", "--dry-run"]
+                    self.assertIsNone(main())
+            finally:
+                os.chdir(cwd)
+
+            # assert - the dry run lists the argv of each task
+            run_mock.assert_not_called()
+            self.assertEqual(4, len(cm.output))
+            for i, name in enumerate(["a", "b"]):
+                self.assertIn(
+                    "Would run run-mock with args ('solution.py', False, "
+                    "['', '--input_data', '%s.tif', '--output_data', 'output/%s_out.tif']).." % (name, name),
+                    cm.output[2 + i]
+                )
 
     def test_run_queue(self):
         # mocks
@@ -169,13 +214,111 @@ class TestIntegrationExampleCommand(unittest.TestCase):
             self.assertIsNone(main())
 
             # assert
-            self.assertEqual(7, len(cm.output))
-            self.assertIn("Running run-mock with args (\'solution.py\', [\'\'], False)..", cm.output[2])
+            self.assertEqual(8, len(cm.output))
+            self.assertIn("Running run-mock with args (\'solution.py\', False, [\'\'])..", cm.output[2])
             self.assertIn("Initializing 5 worker threads", cm.output[3])
             self.assertIn("registering task 0", cm.output[4])
             self.assertIn("starting task 0", cm.output[5])
             self.assertIn("finished task 0", cm.output[6])
-            run_mock.assert_called_with("solution.py", [""], False)
+            self.assertIn("Summary: 1 of 1 task(s) succeeded, 0 failed.", cm.output[7])
+            run_mock.assert_called_with("solution.py", False, [""])
+
+    def test_run_queue_failure_exit_status(self):
+        # mocks
+        resolve_result = mock.create_autospec(ICollectionSolution)
+        resolve_result.coordinates.return_value = "my-group:my-solution:my-version"
+        self.album.resolve = MagicMock(return_value=resolve_result)
+        run_mock = mock.MagicMock(side_effect=RuntimeError("solution failed"))
+        run_mock.__name__ = "run-mock"
+        self.album._controller.run_manager().run = run_mock
+
+        with self.assertLogs(get_active_logger(), level='INFO') as cm:
+            # run
+            sys.argv = ["", "run-distributed", "solution.py", "--mode", "queue", "--threads", "1"]
+            with self.assertRaises(SystemExit) as exit_context:
+                main()
+
+            # assert - the command fails instead of exiting with status 0
+            self.assertNotEqual(0, exit_context.exception.code)
+            self.assertIsNotNone(exit_context.exception.code)
+            self.assertTrue(any("Summary: 0 of 1 task(s) succeeded, 1 failed." in line for line in cm.output))
+            self.assertIn("album command failed: 1 of 1 task(s) failed.", cm.output[-1])
+
+
+SOLUTION = """
+from album.runner.api import setup
+
+setup(
+    group="group",
+    name="name",
+    version="0.1.0",
+    album_api_version="0.5.1",
+    args=[{"name": "input", "type": "file", "description": "The input file."}],
+)
+"""
+
+
+class TestIntegrationNotInstalledSolution(unittest.TestCase):
+    """Call run-distributed with the path of a solution that is not installed, without mocking the resolving."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        with patch("album.api.configure_root_logger"):
+            self.album = Album.Builder().base_cache_path(Path(self.tmp_dir.name, "album")).build()
+        with patch("album.core.model.configuration.Configuration.get_initial_catalogs", return_value={}):
+            self.album._controller.collection_manager().load_or_create()
+        self.album_patch = patch("album.argument_parsing.create_album_instance", return_value=self.album)
+        self.album_patch.start()
+
+        self.solution = str(Path(self.tmp_dir.name, "solution.py"))
+        Path(self.solution).write_text(SOLUTION)
+        self.input_pattern = str(Path(self.tmp_dir.name, "*.tif"))
+        Path(self.tmp_dir.name, "a.tif").touch()
+        Path(self.tmp_dir.name, "b.tif").touch()
+
+        self.run_mock = mock.MagicMock()
+        self.run_mock.__name__ = "run-mock"
+        self.album._controller.run_manager().run = self.run_mock
+        self.album.install = MagicMock()
+
+    def tearDown(self) -> None:
+        self.album_patch.stop()
+        super().tearDown()
+
+    def test_dry_run(self):
+        self.assertFalse(self.album.is_installed(self.solution))
+        with self.assertLogs(get_active_logger(), level='INFO') as cm:
+            sys.argv = ["", "run-distributed", self.solution, "--input", self.input_pattern, "--dry-run"]
+            self.assertIsNone(main())
+
+        # the tasks are listed, the solution is neither installed nor run
+        self.assertEqual(2, len([line for line in cm.output if "Would run run-mock" in line]))
+        self.assertTrue(any('Solution "%s" is not installed.' % self.solution in line for line in cm.output))
+        self.album.install.assert_not_called()
+        self.run_mock.assert_not_called()
+
+    def test_run_not_installed(self):
+        with self.assertLogs(get_active_logger(), level='INFO') as cm:
+            sys.argv = ["", "run-distributed", self.solution, "--input", self.input_pattern]
+            with self.assertRaises(SystemExit) as exit_context:
+                main()
+
+        # the command fails before running any task
+        self.assertNotEqual(0, exit_context.exception.code)
+        self.assertIn(
+            'album command failed: Solution "%s" is not installed. Install it with "album install %s" or pass '
+            '--install.' % (self.solution, self.solution), cm.output[-1]
+        )
+        self.run_mock.assert_not_called()
+
+    def test_run_install(self):
+        sys.argv = ["", "run-distributed", self.solution, "--input", self.input_pattern, "--install"]
+        self.assertIsNone(main())
+
+        # the solution is installed once, then the tasks run
+        self.album.install.assert_called_once_with(self.solution)
+        self.assertEqual(2, self.run_mock.call_count)
 
 
 if __name__ == '__main__':
