@@ -16,6 +16,8 @@ We use the following:
 
 ## [unreleased]
 
+## [0.3.0]
+
 ### Added
 
 - after running the tasks, a summary with the number of succeeded / failed / not run tasks and the arguments of the
@@ -32,6 +34,8 @@ We use the following:
   first pattern
 - `--mode` only accepts the implemented modes (`basic`, `queue`); the `queue` mode is listed in the help, and an
   unknown mode is an error instead of silently doing nothing
+- Python 3.14 is listed among the supported Python versions; the CI tests it
+- requires album 1.0 (`album>=1.0.0,<2.0.0`, was `album>=0.12.0,<0.13.0`)
 
 ### Removed
 
@@ -83,6 +87,7 @@ We use the following:
 
 - changelog to the repository
 
-[unreleased]: https://gitlab.com/album-app/album-distributed/-/compare/v0.2.1...HEAD
+[unreleased]: https://gitlab.com/album-app/album-distributed/-/compare/v0.3.0...HEAD
+[0.3.0]: https://gitlab.com/album-app/album-distributed/-/compare/v0.2.1...v0.3.0
 [0.2.1]: https://gitlab.com/album-app/album-distributed/-/compare/v0.2.0...v0.2.1
 [0.2.0]: https://gitlab.com/album-app/album-distributed/-/tags/v0.2.0

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "album-distributed"
-version = "0.2.1"
+version = "0.3.0"
 authors = [
     {name = "Deborah Schmidt", email = "mail@frauzufall.de"},
     {name = "Jan Philipp Albrecht", email = "album@jpalbrecht.de"},
@@ -29,12 +29,13 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: Implementation :: PyPy",
     "Topic :: Utilities"
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "album>=0.12.0,<0.13.0",
+    "album>=1.0.0,<2.0.0",
 ]
 
 [tool.setuptools.packages.find]
